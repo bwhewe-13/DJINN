@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.ipynb
+
+# Packaging
+*.egg-info/
+*.egg
+
+env/
+build/
+
+# Sphinx documentation
+docs/_build/
