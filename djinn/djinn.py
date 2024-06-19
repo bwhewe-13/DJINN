@@ -328,6 +328,7 @@ class DJINN_Regressor():
         if(x_test.ndim == 1): x_test = x_test.reshape(1,-1)
         samples = {}
         samples['inputs'] = x_test
+        self.__xscale.clip = False
         x_test = self.__xscale.transform(x_test)
         samples['predictions'] = {}
         for p in range(0, self.__n_trees):
