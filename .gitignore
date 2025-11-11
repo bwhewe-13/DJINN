@@ -3,7 +3,11 @@ __pycache__/
 *.py[cod]
 *.ipynb
 
+# C/C++
+*.so
+
 # Packaging
+*.egg-info
 *.egg-info/
 *.egg
 
@@ -12,3 +16,18 @@ build/
 
 # Sphinx documentation
 docs/_build/
+
+# Coverage files
+.pytest_cache/
+.coverage
+.coveragerc
+coverage.xml
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Tests
+.pytest_cache/

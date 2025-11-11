@@ -3,6 +3,9 @@ Deep Jointly-Informed Neural Networks
 ======================================
 **DJINN: Deep jointly-informed neural networks**
 
+Fork notice: This repository is a fork and continuation of LLNL's DJINN project (Deep Jointly-Informed Neural Networks) originally developed by Kelli D. Humbird (humbird1@llnl.gov). The original project is available at https://github.com/LLNL/djinn and is distributed under the license found in `LICENSE`. This fork is maintained by Ben Whewell (ben.whewell@pm.me) — https://github.com/bwhewe-13/DJINN
+
+
 DJINN is an easy-to-use algorithm for training deep neural networks on supervised regression tasks. 
 For additional information, refer to the paper "Deep neural network initialization with decision trees", cited below. 
 
@@ -10,20 +13,20 @@ For additional information, refer to the paper "Deep neural network initializati
 
 Getting Started
 -----------
-DJINN requires TensorFlow (v1.0.1 or later) and  
-scikit-learn (v0.18 or later is recommended).
+Original DJINN required TensorFlow. This fork has been ported to use PyTorch instead of TensorFlow; please install PyTorch and scikit-learn to run this fork.
 DJINN also uses numpy, matplotlib, and cPickle.
 Sphinx is required to view the html documentation.
 
 Note that the sklearn version used when training a DJINN model must be
 the same version used when reloading/evaluating the saved model. 
 
-To use DJINN, clone the repo and install: 
+To use this fork, clone the repo and install the primary runtime dependencies (example using pip):
 
-    $ git clone https://github.com/LLNL/DJINN.git
+    $ git clone https://github.com/bwhewe-13/DJINN.git
     $ cd DJINN
-    $ pip install -r requirements.txt
-    $ pip install .
+    $ python -m pip install --upgrade pip
+    $ python -m pip install torch scikit-learn numpy matplotlib
+    $ python -m pip install .
 
 
 Try it out! 
@@ -43,11 +46,6 @@ If matplotlib will not import, try running "pythonw", for example:
 
     $ pythonw djinn_example.py
     
-**Python3 and Tensorflow2**
-There is a branch (tf2-py3) that offers a python3 friendly version of djinn that runs on tensorflow2. You can make the tensorflow1 version of djinn python3 friendly by modifying the "djinn.py" script by changing: 
-    $ from djinn_fns 
-    to 
-    $ from .djinn_fns 
 
 
 ### Documentation
