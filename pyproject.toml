@@ -1,13 +1,11 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "djinnml"
 version = "1.0"
 description = "Deep Jointly-Informed Neural Networks"
-readme = "README.md"
-readme-content-type = "text/markdown"
 requires-python = ">=3.7, <4"
 license = { text = "LLNL" }
 authors = [ { name = "Kelli Humbird", email = "humbird1@llnl.gov" } ]
@@ -32,6 +30,10 @@ dependencies = [
     "scipy",
     "scikit-learn>=0.21",
 ]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
 
 [project.urls]
 Repository = "https://github.com/bwhewe-13/DJINN"

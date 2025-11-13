@@ -30,11 +30,11 @@ To use this fork, clone the repo and install the primary runtime dependencies (e
 
 
 Try it out! 
-Examples for training DJINN models are included in the [tests](./tests) folder. 
+Examples for training DJINN models are included in the [examples](./examples) folder. 
 
- -python [djinn_example.py](./tests/djinn_example.py) (single output)
+ -python [djinn_example.py](./examples/djinn_example.py) (single output)
 
- -python [djinn_multiout_example.py](./tests/djinn_multiout_example.py) (multiple outputs)
+ -python [djinn_multiout_example.py](./examples/djinn_multiout_example.py) (multiple outputs)
 
 
 For Mac users with Anaconda installs, it might be necessary to manually install matplotlib via pip:
