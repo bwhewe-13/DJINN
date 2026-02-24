@@ -58,7 +58,6 @@ def get_dimensions(X, Y, regression):
     nin = X.shape[1]
 
     if regression:
-        print("new", Y.shape)
         if Y.size > Y.shape[0]:
             nout = Y.shape[1]
         else:
@@ -243,23 +242,6 @@ def initialize_weight_arrays(djinn_arch, num_layers):
         neurons_layer.append(np.arange(djinn_arch[i], djinn_arch[i + 1]))
 
     return djinn_weights, neurons_layer
-
-
-# def add_diagonal_connections(djinn_weights, max_depth_feature, nin, num_layers):
-#     """Add diagonal pass-through connections for active features.
-
-#     Parameters
-#     ----------
-#     djinn_weights : dict
-#         Layer weight matrices to modify in-place.
-#     max_depth_feature : numpy.ndarray
-#         Maximum depth where each feature appears in the tree.
-#     nin : int
-#         Number of input features.
-#     num_layers : int
-#         Number of network layers.
-#     """
-#     ...
 
 
 def process_split_node(

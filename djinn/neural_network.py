@@ -16,6 +16,8 @@
 # For details about use and distribution, please read DJINN/LICENSE .
 ###############################################################################
 
+from pathlib import Path
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -25,7 +27,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
 
-def scale_data(x, y, xscale, yscale, regression, seed, n_classes):
+def scale_data(x, y, xscale, yscale, regression, seed, n_classes, test=False):
     """Scale data and split into a training subset.
 
     Parameters
@@ -61,16 +63,23 @@ def scale_data(x, y, xscale, yscale, regression, seed, n_classes):
         else:
             y = yscale.transform(y)
 
-    xtrain, _, ytrain, _ = train_test_split(x, y, test_size=0.1, random_state=seed)
+    xtrain, xtest, ytrain, ytest = train_test_split(
+        x, y, test_size=0.1, random_state=seed
+    )
 
     # for classification, do one-hot encoding on classes
     if not regression:
         ytrain = F.one_hot(ytrain.flatten(), num_classes=torch.unique(ytrain).numel())
+        ytest = F.one_hot(ytest.flatten(), num_classes=torch.unique(ytest).numel())
 
-    x_tensor = torch.tensor(xtrain, dtype=torch.float32)
-    y_tensor = torch.tensor(ytrain, dtype=torch.float32)
+    xtrain_tensor = torch.tensor(xtrain, dtype=torch.float32)
+    xtest_tensor = torch.tensor(xtest, dtype=torch.float32)
+    ytrain_tensor = torch.tensor(ytrain, dtype=torch.float32)
+    ytest_tensor = torch.tensor(ytest, dtype=torch.float32)
 
-    return x_tensor, y_tensor
+    if test:
+        return xtrain_tensor, xtest_tensor, ytrain_tensor, ytest_tensor
+    return xtrain_tensor, ytrain_tensor
 
 
 class MultiLayerPerceptron(nn.Module):
@@ -142,31 +151,6 @@ class MultiLayerPerceptron(nn.Module):
         return x
 
 
-def _l2_kernel_penalty(model, weight_decay):
-    """Compute L2 penalty over kernel weights only.
-
-    Parameters
-    ----------
-    model : MultiLayerPerceptron
-        Network containing hidden and output linear layers.
-    weight_decay : float
-        L2 multiplier.
-
-    Returns
-    -------
-    float or torch.Tensor
-        Zero when ``weight_decay`` is falsy, otherwise the scaled L2 penalty term.
-    """
-    if not weight_decay:
-        return 0.0
-
-    penalty = 0.0
-    for layer in model.hidden_layers:
-        penalty = penalty + torch.sum(layer.weight.pow(2))
-    penalty = penalty + torch.sum(model.output_layer.weight.pow(2))
-    return 0.5 * weight_decay * penalty
-
-
 def build_tree_weights_and_biases(ttn, key):
     """Construct per-layer weights and random biases from mapped tree data.
 
@@ -230,19 +214,79 @@ def prepare_dataloader(xtrain, ytrain, regression, batch_size, device):
         Shuffled training dataloader.
     """
 
-    xtrain = torch.tensor(xtrain, dtype=torch.float32, device=device)
+    xtrain = torch.as_tensor(xtrain, dtype=torch.float32, device=device)
 
     if regression:
-        ytrain = torch.tensor(ytrain, dtype=torch.float32, device=device)
+        ytrain = torch.as_tensor(ytrain, dtype=torch.float32, device=device)
+        if ytrain.ndim == 1:
+            ytrain = ytrain.unsqueeze(1)
     else:
         if ytrain.ndim > 1:
-            ytrain = torch.argmax(torch.tensor(ytrain, dtype=torch.float32), dim=1)
+            ytrain = torch.argmax(torch.as_tensor(ytrain, dtype=torch.float32), dim=1)
         else:
-            ytrain = torch.tensor(ytrain, dtype=torch.long)
+            ytrain = torch.as_tensor(ytrain, dtype=torch.long)
         ytrain = ytrain.to(device)
 
     dataset = TensorDataset(xtrain, ytrain)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+
+def train_one_epoch(model, loader, criterion, optimizer):
+    """Run one optimization epoch over the training loader.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Model to train.
+    loader : torch.utils.data.DataLoader
+        Mini-batch dataloader for training data.
+    criterion : callable
+        Loss function used to compute training loss.
+    optimizer : torch.optim.Optimizer
+        Optimizer used to update model parameters.
+
+    Returns
+    -------
+    float
+        Mean loss across all mini-batches in the epoch.
+    """
+    model.train()
+    total_loss = 0.0
+
+    for xb, yb in loader:
+        optimizer.zero_grad()
+        outputs = model(xb)
+        loss = criterion(outputs, yb)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+
+    return total_loss / len(loader)
+
+
+@torch.no_grad()
+def evaluate(model, x, y, criterion):
+    """Evaluate a model on a fixed dataset without gradient tracking.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Model to evaluate.
+    x : torch.Tensor
+        Input features for evaluation.
+    y : torch.Tensor
+        Targets corresponding to ``x``.
+    criterion : callable
+        Loss function used to score predictions.
+
+    Returns
+    -------
+    float
+        Scalar loss value on the provided dataset.
+    """
+    model.eval()
+    outputs = model(x)
+    return criterion(outputs, y).item()
 
 
 def train_model(
@@ -279,32 +323,19 @@ def train_model(
         Mean training loss per epoch.
     """
 
-    if regression:
-        criterion = nn.MSELoss()
-    else:
-        criterion = nn.CrossEntropyLoss()
+    criterion = nn.MSELoss() if regression else nn.CrossEntropyLoss()
 
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(
+        model.parameters(), lr=lr, weight_decay=weight_decay, eps=1e-8
+    )
 
     losses = []
     best_loss = float("inf")
     patience_counter = 0
 
-    for epoch in range(epochs):
+    for _ in range(epochs):
         model.train()
-        running_loss = 0.0
-
-        for xb, yb in loader:
-            optimizer.zero_grad()
-            outputs = model(xb)
-            loss = criterion(outputs, yb)
-            if weight_decay:
-                loss = loss + _l2_kernel_penalty(model, weight_decay)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-
-        epoch_loss = running_loss / len(loader)
+        epoch_loss = train_one_epoch(model, loader, criterion, optimizer)
         losses.append(epoch_loss)
 
         # Optional early stopping
@@ -461,7 +492,9 @@ def find_optimal_epochs(
     else:
         criterion = nn.CrossEntropyLoss()
 
-    optimizer = optim.Adam(model.parameters(), lr=lr, eps=1e-8)
+    optimizer = optim.Adam(
+        model.parameters(), lr=lr, weight_decay=weight_decay, eps=1e-8
+    )
 
     accur = []
     epoch = 0
@@ -469,15 +502,12 @@ def find_optimal_epochs(
 
     epoch = 200
     for _ in range(epoch):
-        epoch_loss = _train_one_epoch(model, loader, criterion, optimizer, weight_decay)
+        epoch_loss = train_one_epoch(model, loader, criterion, optimizer)
         accur.append(epoch_loss)
 
     while not converged and epoch < max_training_epochs:
-
         for _ in range(10):
-            epoch_loss = _train_one_epoch(
-                model, loader, criterion, optimizer, weight_decay
-            )
+            epoch_loss = train_one_epoch(model, loader, criterion, optimizer)
             accur.append(epoch_loss)
 
         epoch += 10
@@ -500,43 +530,6 @@ def find_optimal_epochs(
             maxep = max_training_epochs
 
     return maxep
-
-
-def _train_one_epoch(model, loader, criterion, optimizer, weight_decay=0.0):
-    """Train a single epoch and return mean batch loss.
-
-    Parameters
-    ----------
-    model : nn.Module
-        Model to optimize.
-    loader : torch.utils.data.DataLoader
-        Training batches.
-    criterion : nn.Module
-        Loss function.
-    optimizer : torch.optim.Optimizer
-        Optimizer used for parameter updates.
-    weight_decay : float, optional
-        L2 regularization strength.
-
-    Returns
-    -------
-    float
-        Mean loss across batches for the epoch.
-    """
-    model.train()
-    running_loss = 0.0
-
-    for xb, yb in loader:
-        optimizer.zero_grad()
-        outputs = model(xb)
-        loss = criterion(outputs, yb)
-        if weight_decay:
-            loss = loss + _l2_kernel_penalty(model, weight_decay)
-        loss.backward()
-        optimizer.step()
-        running_loss += loss.item()
-
-    return running_loss / len(loader)
 
 
 def get_hyperparams(
@@ -625,3 +618,333 @@ def get_hyperparams(
     print("Optimal batch size: ", batch_size)
 
     return (batch_size, lr, opt_epochs)
+
+
+def get_min_max(x, y, n_classes):
+    """Compute per-dimension minimum and maximum values for inputs and outputs.
+
+    Parameters
+    ----------
+    x : ndarray
+        Input feature matrix.
+    y : ndarray
+        Output targets.
+    n_classes : int
+        Number of output targets/classes.
+
+    Returns
+    -------
+    tuple[list[numpy.ndarray], list[numpy.ndarray]]
+        Tuple ``(input_minmax, output_minmax)`` where each element is
+        ``[min_values, max_values]``.
+    """
+    input_min = np.min(x, axis=0)
+    input_max = np.max(x, axis=0)
+    if n_classes == 1:
+        y = y.reshape(-1, 1)
+    output_min = np.min(y, axis=0)
+    output_max = np.max(y, axis=0)
+
+    return [input_min, input_max], [output_min, output_max]
+
+
+def get_weights_and_biases(model):
+    """Extract dense layer weights and biases from a trained model.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Model whose parameters are extracted.
+
+    Returns
+    -------
+    tuple[list[torch.Tensor], list[torch.Tensor]]
+        Tuple ``(dense_weights, dense_biases)`` in model parameter order.
+    """
+    dense_weights = []
+    dense_biases = []
+
+    for name, param in model.named_parameters():
+        if "weight" in name:
+            dense_weights.append(param.data)
+        elif "bias" in name:
+            dense_biases.append(param.data)
+
+    return dense_weights, dense_biases
+
+
+def train_single_tree(model, loader, criterion, optimizer, xtest, ytest, epochs):
+    """Train a single tree-mapped network and track train/validation losses.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Network initialized from one mapped tree.
+    loader : torch.utils.data.DataLoader
+        Training dataloader.
+    criterion : callable
+        Loss function used for training and validation.
+    optimizer : torch.optim.Optimizer
+        Optimizer used during training.
+    xtest : torch.Tensor
+        Validation input features.
+    ytest : torch.Tensor
+        Validation targets.
+    epochs : int
+        Number of training epochs.
+
+    Returns
+    -------
+    tuple[nn.Module, list[float], list[float]]
+        Tuple ``(model, train_history, valid_history)`` where histories hold
+        per-epoch loss values.
+    """
+
+    train_history = []
+    valid_history = []
+
+    for epoch in range(epochs):
+        train_loss = train_one_epoch(model, loader, criterion, optimizer)
+        val_loss = evaluate(model, xtest, ytest, criterion)
+
+        train_history.append(train_loss)
+        valid_history.append(val_loss)
+
+    return model, train_history, valid_history
+
+
+def save_tree_model(model, tree_idx, ttn, model_dir):
+    """Persist one trained tree-model checkpoint to disk.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Trained model to serialize.
+    tree_idx : int
+        Zero-based index of the tree in the ensemble.
+    ttn : dict
+        Tree-to-network mapping dictionary containing ``network_shape``.
+    model_dir : pathlib.Path
+        Directory where the checkpoint is written.
+    """
+    save_path = model_dir / f"tree_{tree_idx}.pt"
+
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "network_shape": ttn["network_shape"][tree_idx],
+        },
+        save_path,
+    )
+
+
+def save_experiment_metadata(model_dir, config, history):
+    """Save run configuration and loss history metadata.
+
+    Parameters
+    ----------
+    model_dir : pathlib.Path
+        Directory where metadata files are written.
+    config : dict
+        Experiment settings used for training.
+    history : dict
+        Training/validation history arrays.
+    """
+    torch.save(config, model_dir / "config.pt")
+    torch.save(history, model_dir / "history.pt")
+
+
+def get_unique_model_name(model_path):
+    """Create a unique model directory path by appending a numeric suffix.
+
+    Parameters
+    ----------
+    model_path : str or pathlib.Path
+        Desired base path for model output directory.
+
+    Returns
+    -------
+    pathlib.Path
+        Newly created unique directory path.
+    """
+
+    model_path = Path(model_path)
+    unique_path = model_path
+
+    counter = 0
+    while unique_path.exists():
+        counter += 1
+        fcounter = str(counter).zfill(2)
+        unique_path = model_path.with_name(f"{model_path.name}_{fcounter}")
+
+    # Create the unique directory
+    unique_path.mkdir(parents=True, exist_ok=False)
+    return unique_path
+
+
+def torch_dropout_regression(
+    regression,
+    ttn,
+    xscale,
+    yscale,
+    x,
+    y,
+    ntrees,
+    lr,
+    n_epochs,
+    batch_size,
+    dropout_keep_prob,
+    weight_decay,
+    **kwargs,
+):
+    """Train DJINN tree-initialized neural networks with PyTorch dropout.
+
+    Parameters
+    ----------
+    regression : bool
+        Whether the task is regression or classification.
+    ttn : dict
+        Dictionary returned from tree-to-network mapping.
+    xscale : object
+        Fitted scaler used to transform input features.
+    yscale : object
+        Fitted scaler used to transform targets for regression.
+    x : ndarray
+        Input features.
+    y : ndarray
+        Output targets.
+    ntrees : int
+        Number of tree-mapped networks to train.
+    lr : float
+        Adam learning rate.
+    n_epochs : int
+        Number of training epochs.
+    batch_size : int
+        Mini-batch size.
+    dropout_keep_prob : float
+        Probability of keeping hidden units active during dropout.
+    weight_decay : float
+        L2 regularization strength for optimizer updates.
+    **kwargs : dict
+        Optional keyword arguments including ``save_model``, ``save_files``,
+        ``model_path``, ``device``, and ``seed``.
+
+    Returns
+    -------
+    dict
+        Trained network information including initial/final weights and biases,
+        input/output min-max values, and train/validation loss history.
+    """
+    # Kwargs
+    save_model = kwargs.get("save_model", True)
+    save_files = kwargs.get("save_files", True)
+    model_path = kwargs.get("model_path", "djinn_model")
+    device = torch.device(kwargs.get("device", "cpu"))
+
+    # Set Seed
+    seed = kwargs.get("seed", None)
+    if seed is not None:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+
+    n_classes = ttn["n_out"]
+    if n_classes == 1:
+        y = y.reshape(-1, 1)
+
+    # save min/max values for python-only djinn eval
+    input_minmax, output_minmax = get_min_max(x, y, n_classes)
+
+    # create dict/arrays to save network info
+    nninfo = {
+        "input_minmax": input_minmax,
+        "output_minmax": output_minmax,
+        "initial_weights": {},
+        "initial_biases": {},
+        "final_weights": {},
+        "final_biases": {},
+    }
+
+    # Scale data and split into train/test sets
+    xtrain, xtest, ytrain, ytest = scale_data(
+        x, y, xscale, yscale, regression, seed, n_classes, test=True
+    )
+
+    if regression and n_classes == 1:
+        if ytrain.ndim == 1:
+            ytrain = ytrain.unsqueeze(1)
+        if ytest.ndim == 1:
+            ytest = ytest.unsqueeze(1)
+
+    if save_model or save_files:
+        model_dir = get_unique_model_name(model_path)
+
+    all_train_history = []
+    all_valid_history = []
+
+    # loop through trees, training each network in ensemble
+    for idx, keys in enumerate(ttn["weights"]):
+        # Initialize model weights and biases from tree mapping
+        weights, biases = build_tree_weights_and_biases(ttn, keys)
+        loader = prepare_dataloader(xtrain, ytrain, regression, batch_size, device)
+
+        # Create model and optimizer for this tree
+        model = MultiLayerPerceptron(weights, biases, dropout_keep_prob).to(device)
+        criterion = nn.MSELoss() if regression else nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=lr,
+            weight_decay=weight_decay,
+            eps=1e-7,  # TF default
+        )
+
+        # Save initial weights/biases
+        dense_weights, dense_biases = get_weights_and_biases(model)
+        nninfo["initial_weights"][keys] = dense_weights
+        nninfo["initial_biases"][keys] = dense_biases
+
+        # Train model and record history
+        model, train_hist, valid_hist = train_single_tree(
+            model, loader, criterion, optimizer, xtest, ytest, n_epochs
+        )
+
+        # Save final weights/biases
+        dense_weights, dense_biases = get_weights_and_biases(model)
+        nninfo["final_weights"][keys] = dense_weights
+        nninfo["final_biases"][keys] = dense_biases
+
+        if save_model:
+            save_tree_model(model, idx, ttn, model_dir)
+
+        all_train_history.append(train_hist)
+        all_valid_history.append(valid_hist)
+
+
+
+    # Save experiment metadata
+    if len(all_train_history) == 1:
+        nninfo["train_cost"] = np.array(all_train_history[0])
+        nninfo["valid_cost"] = np.array(all_valid_history[0])
+    else:
+        nninfo["train_cost"] = np.array(all_train_history)
+        nninfo["valid_cost"] = np.array(all_valid_history)
+
+    if save_files:
+        config = {
+            "regression": regression,
+            "n_classes": n_classes,
+            "ntrees": ntrees,
+            "lr": lr,
+            "n_epochs": n_epochs,
+            "batch_size": batch_size,
+            "dropout_keep_prob": dropout_keep_prob,
+            "weight_decay": weight_decay,
+            "seed": seed,
+        }
+
+        history = {
+            "train_loss": np.array(all_train_history),
+            "valid_loss": np.array(all_valid_history),
+        }
+        save_experiment_metadata(model_dir, config, history)
+
+    return nninfo
