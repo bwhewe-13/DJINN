@@ -16,6 +16,7 @@
 # For details about use and distribution, please read DJINN/LICENSE .
 ###############################################################################
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -658,7 +659,7 @@ def get_weights_and_biases(model):
 
     Returns
     -------
-    tuple[list[torch.Tensor], list[torch.Tensor]]
+    tuple[list[numpy.ndarray], list[numpy.ndarray]]
         Tuple ``(dense_weights, dense_biases)`` in model parameter order.
     """
     dense_weights = []
@@ -669,6 +670,9 @@ def get_weights_and_biases(model):
             dense_weights.append(param.data)
         elif "bias" in name:
             dense_biases.append(param.data)
+
+    dense_weights = [w.detach().cpu().numpy() for w in dense_weights]
+    dense_biases = [b.detach().cpu().numpy() for b in dense_biases]
 
     return dense_weights, dense_biases
 
@@ -918,8 +922,6 @@ def torch_dropout_regression(
         all_train_history.append(train_hist)
         all_valid_history.append(valid_hist)
 
-
-
     # Save experiment metadata
     if len(all_train_history) == 1:
         nninfo["train_cost"] = np.array(all_train_history[0])
@@ -948,3 +950,227 @@ def torch_dropout_regression(
         save_experiment_metadata(model_dir, config, history)
 
     return nninfo
+
+
+def load_tree_data(xscale, yscale, x, y, regression, batch_size, device):
+    """Scale training data and build a retraining dataloader.
+
+    Parameters
+    ----------
+    xscale : object
+        Fitted scaler used to transform input features.
+    yscale : object
+        Fitted scaler used to transform regression targets.
+    x : ndarray
+        Input feature matrix.
+    y : ndarray
+        Training targets.
+    regression : bool
+        Whether the task is regression or classification.
+    batch_size : int
+        Mini-batch size.
+    device : torch.device
+        Device where tensors are materialized.
+
+    Returns
+    -------
+    torch.utils.data.DataLoader
+        Shuffled dataloader for retraining.
+    """
+    # Scale training data
+    y = np.asarray(y)
+    if regression:
+        n_classes = y.shape[1] if (y.ndim > 1 and y.shape[1] > 1) else 1
+    else:
+        n_classes = np.unique(y).size
+
+    xtrain = xscale.transform(x)
+    if regression and n_classes == 1:
+        ytrain = yscale.transform(y.reshape(-1, 1))
+    elif regression:
+        ytrain = yscale.transform(y)
+    else:
+        ytrain = F.one_hot(
+            torch.as_tensor(y.flatten(), dtype=torch.long), num_classes=n_classes
+        ).to(dtype=torch.float32)
+
+    loader = prepare_dataloader(
+        xtrain,
+        ytrain,
+        regression,
+        batch_size,
+        device,
+    )
+
+    return loader
+
+
+def load_tree_model(checkpoint_path, device, dropout_keep_prob, tree_idx):
+    """Restore a saved tree checkpoint as a PyTorch model.
+
+    Parameters
+    ----------
+    checkpoint_path : str or pathlib.Path
+        Path to the ``tree_*.pt`` checkpoint.
+    device : torch.device
+        Device used to load tensors and construct the model.
+    dropout_keep_prob : float
+        Keep probability used when rebuilding dropout layers.
+    tree_idx : int
+        Zero-based tree index for logging.
+
+    Returns
+    -------
+    tuple[nn.Module, dict]
+        Tuple of ``(model, network_shape)`` restored from checkpoint.
+    """
+    try:
+        checkpoint = torch.load(
+            checkpoint_path,
+            map_location=device,
+            weights_only=True,
+        )
+    except TypeError:
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+    except Exception:
+        checkpoint = torch.load(
+            checkpoint_path, map_location=device, weights_only=False
+        )
+
+    # Rebuild model from saved structure
+    network_shape = checkpoint["network_shape"]
+    weights = network_shape["weights"]
+    biases = network_shape["biases"]
+
+    model = MultiLayerPerceptron(
+        weights,
+        biases,
+        dropout_keep_prob,
+    ).to(device)
+
+    model.load_state_dict(checkpoint["state_dict"])
+    print(f"Tree {tree_idx} restored")
+    return model, network_shape
+
+
+def torch_continue_training(
+    regression,
+    xscale,
+    yscale,
+    x,
+    y,
+    ntrees,
+    lr,
+    n_epochs,
+    batch_size,
+    dropout_keep_prob,
+    model_dir,
+    model_name=None,
+    weight_decay=0.0,
+    seed=None,
+    device=None,
+):
+    """Continue training previously saved DJINN PyTorch models.
+
+    Parameters
+    ----------
+    regression : bool
+        Regression or classification task.
+    xscale : fitted scaler
+        Input scaler.
+    yscale : fitted scaler
+        Output scaler (regression only).
+    x : ndarray
+        Training inputs.
+    y : ndarray
+        Training targets.
+    ntrees : int
+        Number of tree models in ensemble.
+    lr : float
+        Learning rate.
+    n_epochs : int
+        Additional epochs to train.
+    batch_size : int
+        Mini-batch size.
+    dropout_keep_prob : float
+        Keep probability for dropout.
+    model_dir : str or Path
+        Directory containing saved tree_*.pt models.
+    model_name : str or None
+        Optional model name used when writing retraining metadata file.
+    weight_decay : float
+        L2 regularization.
+    seed : int or None
+        Random seed.
+    device : torch.device or None
+        Device to train on.
+
+    Returns
+    -------
+    None
+        Re-saves tree checkpoints and writes retraining metadata.
+    """
+
+    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_dir = Path(model_dir)
+
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    loader = load_tree_data(xscale, yscale, x, y, regression, batch_size, device)
+
+    nninfo = {
+        "weights": {},
+        "biases": {},
+        "initial_weights": {},
+        "initial_biases": {},
+    }
+
+    # Continue training each tree
+    for tree_idx in range(ntrees):
+
+        # Load checkpoint for this tree
+        checkpoint_path = model_dir / f"tree_{tree_idx}.pt"
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+
+        # Load the tree model
+        model, network_shape = load_tree_model(
+            checkpoint_path, device, dropout_keep_prob, tree_idx
+        )
+        dense_weights, dense_biases = get_weights_and_biases(model)
+        nninfo["initial_weights"][f"tree{tree_idx}"] = dense_weights
+        # nninfo["initial_biases"][f"tree{tree_idx}"] = dense_biases
+
+        # Train model for additional epochs
+        _ = train_model(
+            model,
+            loader,
+            regression,
+            lr,
+            weight_decay,
+            epochs=n_epochs,
+            early_stop_patience=None,
+        )
+        print("Optimization Finished!")
+
+        # Resave checkpoint
+        torch.save(
+            {
+                "state_dict": model.state_dict(),
+                "network_shape": network_shape,
+            },
+            checkpoint_path,
+        )
+        print(f"Tree {tree_idx} resaved at {checkpoint_path}")
+
+        # Save final weights/biases to metadata
+        dense_weights, dense_biases = get_weights_and_biases(model)
+        nninfo["weights"][f"tree{tree_idx}"] = dense_weights
+        nninfo["biases"][f"tree{tree_idx}"] = dense_biases
+
+    if model_name is None:
+        model_name = model_dir.name
+
+    with open(model_dir / f"retrained_nn_info_{model_name}.json", "w") as file:
+        json.dump(nninfo, file, indent=4)
