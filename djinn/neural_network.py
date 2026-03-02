@@ -383,7 +383,7 @@ def get_learning_rate(
         Mini-batch size.
     weight_decay : float, optional
         L2 regularization strength.
-    device : torch.device or None, optional
+    device : torch.device, str, or None, optional
         Compute device.
 
     Returns
@@ -392,7 +392,9 @@ def get_learning_rate(
         Selected learning rate.
     """
 
-    if device is None:
+    if isinstance(device, str):
+        device = torch.device(device)
+    elif device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     loader = prepare_dataloader(xtrain, ytrain, regression, batch_size, device)
@@ -469,7 +471,7 @@ def find_optimal_epochs(
         L2 regularization strength.
     max_training_epochs : int, optional
         Upper bound on epochs.
-    device : torch.device or None, optional
+    device : torch.device, str, or None, optional
         Compute device.
 
     Returns
@@ -478,7 +480,9 @@ def find_optimal_epochs(
         Estimated number of training epochs.
     """
 
-    if device is None:
+    if isinstance(device, str):
+        device = torch.device(device)
+    elif device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Build dataloader once
@@ -843,7 +847,9 @@ def torch_dropout_regression(
     save_model = kwargs.get("save_model", True)
     save_files = kwargs.get("save_files", True)
     model_path = kwargs.get("model_path", "djinn_model")
-    device = torch.device(kwargs.get("device", "cpu"))
+    device = kwargs.get("device", "cpu")
+    if isinstance(device, str):
+        device = torch.device(device)
 
     # Set Seed
     seed = kwargs.get("seed", None)
@@ -1102,7 +1108,7 @@ def torch_continue_training(
         L2 regularization.
     seed : int or None
         Random seed.
-    device : torch.device or None
+    device : torch.device, str, or None
         Device to train on.
 
     Returns
@@ -1111,7 +1117,10 @@ def torch_continue_training(
         Re-saves tree checkpoints and writes retraining metadata.
     """
 
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if isinstance(device, str):
+        device = torch.device(device)
+    elif device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_dir = Path(model_dir)
 
     if seed is not None:

@@ -18,6 +18,86 @@
 
 
 import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import MinMaxScaler
+
+
+def fit_scalers(X, Y, regression):
+    """Fit MinMaxScalers on raw input and output data.
+
+    Parameters
+    ----------
+    X : ndarray
+        Input feature matrix of shape ``(n_samples, n_features)``.
+    Y : ndarray
+        Target array of shape ``(n_samples,)`` or ``(n_samples, n_outputs)``.
+    regression : bool
+        Whether the task is regression. Only fits ``yscale`` when True.
+
+    Returns
+    -------
+    tuple[MinMaxScaler, MinMaxScaler or None]
+        Fitted ``(xscale, yscale)``. ``yscale`` is ``None`` for classification.
+    """
+    xscale = MinMaxScaler().fit(X)
+    yscale = MinMaxScaler().fit(Y) if regression else None
+    return xscale, yscale
+
+
+def train_forest(X, Y, n_trees, max_depth, xscale, yscale, regression, seed=None):
+    """Train a RandomForestRegressor on scaled data and return the fitted estimator.
+
+    Parameters
+    ----------
+    X : ndarray
+        Raw input feature matrix of shape ``(n_samples, n_features)``.
+    Y : ndarray
+        Raw target array of shape ``(n_samples,)`` or ``(n_samples, n_outputs)``.
+    n_trees : int
+        Number of trees in the forest.
+    max_depth : int
+        Maximum depth of each decision tree.
+    xscale : MinMaxScaler
+        Fitted input scaler used to transform ``X`` before fitting.
+    yscale : MinMaxScaler or None
+        Fitted output scaler used to transform ``Y`` before fitting.
+        Pass ``None`` for classification.
+    regression : bool
+        Whether the task is regression.
+    seed : int or None, optional
+        Random seed for reproducibility.
+
+    Raises
+    ------
+    Exception
+        If the first tree in the forest has depth less than or equal to 1,
+        indicating the data is too simple to build a meaningful tree.
+
+    Returns
+    -------
+    RandomForestRegressor
+        Fitted sklearn forest estimator.
+    """
+    single_output = Y.ndim == 1 or Y.shape[1] == 1
+
+    rfr = RandomForestRegressor(
+        n_trees,
+        max_depth=max_depth,
+        bootstrap=False,
+        random_state=seed,
+    )
+
+    X_scaled = xscale.transform(X)
+
+    if regression:
+        Y_scaled = (
+            yscale.transform(Y).flatten() if single_output else yscale.transform(Y)
+        )
+    else:
+        Y_scaled = Y.flatten() if single_output else Y
+
+    rfr.fit(X_scaled, Y_scaled)
+    return rfr
 
 
 def xavier_init(nin, nout):
