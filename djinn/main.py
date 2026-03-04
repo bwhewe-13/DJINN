@@ -16,22 +16,29 @@
 # For details about use and distribution, please read DJINN/LICENSE .
 ###############################################################################
 
+"""Public DJINN API for training, inference, and model persistence.
+
+This module exposes the high-level regression and classification interfaces,
+including hyperparameter selection, model training, Bayesian prediction, and
+loading/saving of serialized DJINN models.
+"""
+
 
 import json
 from pathlib import Path
 
 import numpy as np
 import torch
+from sklearn.preprocessing import MinMaxScaler
 
 # Functions from the provided modules
-from neural_network import (
+from djinn.neural_network import (
     get_hyperparams,
     load_tree_model,
     torch_continue_training,
     torch_dropout_regression,
 )
-from random_forest import fit_scalers, train_forest, tree_to_nn_weights
-from sklearn.preprocessing import MinMaxScaler
+from djinn.random_forest import fit_scalers, train_forest, tree_to_nn_weights
 
 
 class DJINN_Regressor:
