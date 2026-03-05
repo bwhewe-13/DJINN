@@ -16,6 +16,8 @@
 # For details about use and distribution, please read DJINN/LICENSE .
 ###############################################################################
 
+"""PyTorch training, evaluation, and persistence utilities for DJINN models."""
+
 import json
 from pathlib import Path
 
@@ -70,13 +72,17 @@ def scale_data(x, y, xscale, yscale, regression, seed, n_classes, test=False):
 
     # for classification, do one-hot encoding on classes
     if not regression:
-        ytrain = F.one_hot(ytrain.flatten(), num_classes=torch.unique(ytrain).numel())
-        ytest = F.one_hot(ytest.flatten(), num_classes=torch.unique(ytest).numel())
+        ytrain = F.one_hot(
+            torch.as_tensor(ytrain.flatten(), dtype=torch.long), num_classes=n_classes
+        )
+        ytest = F.one_hot(
+            torch.as_tensor(ytest.flatten(), dtype=torch.long), num_classes=n_classes
+        )
 
-    xtrain_tensor = torch.tensor(xtrain, dtype=torch.float32)
-    xtest_tensor = torch.tensor(xtest, dtype=torch.float32)
-    ytrain_tensor = torch.tensor(ytrain, dtype=torch.float32)
-    ytest_tensor = torch.tensor(ytest, dtype=torch.float32)
+    xtrain_tensor = torch.as_tensor(xtrain, dtype=torch.float32)
+    xtest_tensor = torch.as_tensor(xtest, dtype=torch.float32)
+    ytrain_tensor = torch.as_tensor(ytrain, dtype=torch.float32)
+    ytest_tensor = torch.as_tensor(ytest, dtype=torch.float32)
 
     if test:
         return xtrain_tensor, xtest_tensor, ytrain_tensor, ytest_tensor

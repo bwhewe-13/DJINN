@@ -1,3 +1,5 @@
+"""Unit tests for DJINN neural-network training and model lifecycle helpers."""
+
 import json
 
 import numpy as np
@@ -65,6 +67,22 @@ def test_scale_data_regression_shapes():
     assert ytrain.ndim == 1
     assert xtrain.shape[0] + xtest.shape[0] == x.shape[0]
     assert ytrain.shape[0] + ytest.shape[0] == y.shape[0]
+
+
+def test_scale_data_classification_one_hot_shapes():
+    x, y = make_classification_data()
+    xscale = MinMaxScaler().fit(x)
+
+    xtrain, xtest, ytrain, ytest = nnf.scale_data(
+        x, y, xscale, None, False, seed=0, n_classes=2, test=True
+    )
+
+    assert isinstance(ytrain, torch.Tensor)
+    assert isinstance(ytest, torch.Tensor)
+    assert ytrain.ndim == 2
+    assert ytest.ndim == 2
+    assert ytrain.shape[1] == 2
+    assert ytest.shape[1] == 2
 
 
 def test_mlp_forward_output_shape():

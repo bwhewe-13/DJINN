@@ -1,5 +1,8 @@
+"""Unit tests for DJINN random-forest preprocessing and tree-to-network mapping."""
+
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.tree import DecisionTreeClassifier
 
 import djinn.random_forest as rfns
@@ -11,6 +14,64 @@ def make_simple_tree():
     clf = DecisionTreeClassifier(max_depth=3, random_state=0)
     clf.fit(X, y)
     return clf, X, y
+
+
+def test_fit_scalers_regression_and_classification():
+    X = np.array([[0.0, 1.0], [2.0, 3.0], [4.0, 5.0]])
+    y_reg = np.array([[1.0], [2.0], [3.0]])
+    y_cls = np.array([0, 1, 0])
+
+    xscale_reg, yscale_reg = rfns.fit_scalers(X, y_reg, regression=True)
+    assert isinstance(xscale_reg, MinMaxScaler)
+    assert isinstance(yscale_reg, MinMaxScaler)
+
+    xscale_cls, yscale_cls = rfns.fit_scalers(X, y_cls, regression=False)
+    assert isinstance(xscale_cls, MinMaxScaler)
+    assert yscale_cls is None
+
+
+def test_train_forest_regression_and_classification():
+    X = np.array(
+        [
+            [0.0, 0.0],
+            [0.0, 1.0],
+            [1.0, 0.0],
+            [1.0, 1.0],
+            [2.0, 1.0],
+            [2.0, 2.0],
+        ]
+    )
+
+    y_reg = (2.0 * X[:, 0] - 0.5 * X[:, 1] + 0.1).reshape(-1, 1)
+    xscale, yscale = rfns.fit_scalers(X, y_reg, regression=True)
+    reg_forest = rfns.train_forest(
+        X,
+        y_reg,
+        n_trees=3,
+        max_depth=3,
+        xscale=xscale,
+        yscale=yscale,
+        regression=True,
+        seed=0,
+    )
+    assert isinstance(reg_forest, RandomForestRegressor)
+    assert len(reg_forest.estimators_) == 3
+
+    y_cls = np.array([0, 0, 1, 1, 1, 0])
+    xscale_cls, yscale_cls = rfns.fit_scalers(X, y_cls, regression=False)
+    cls_forest = rfns.train_forest(
+        X,
+        y_cls,
+        n_trees=2,
+        max_depth=3,
+        xscale=xscale_cls,
+        yscale=yscale_cls,
+        regression=False,
+        seed=0,
+    )
+    assert isinstance(cls_forest, RandomForestRegressor)
+    preds = cls_forest.predict(xscale_cls.transform(X))
+    assert preds.shape[0] == X.shape[0]
 
 
 def test_xavier_init_reproducible():

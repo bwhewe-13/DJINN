@@ -6,50 +6,84 @@ Deep Jointly-Informed Neural Networks
 Fork notice: This repository is a fork and continuation of LLNL's DJINN project (Deep Jointly-Informed Neural Networks) originally developed by Kelli D. Humbird (humbird1@llnl.gov). The original project is available at https://github.com/LLNL/djinn and is distributed under the license found in `LICENSE`. This fork is maintained by Ben Whewell (ben.whewell@pm.me) — https://github.com/bwhewe-13/DJINN
 
 
-DJINN is an easy-to-use algorithm for training deep neural networks on supervised regression tasks. 
-For additional information, refer to the paper "Deep neural network initialization with decision trees", cited below. 
+DJINN is an easy-to-use algorithm for training deep neural networks on supervised regression tasks.
+For additional information, refer to the paper "Deep neural network initialization with decision trees", cited below.
 
 
 
 Getting Started
 -----------
-Original DJINN required TensorFlow. This fork has been ported to use PyTorch instead of TensorFlow; please install PyTorch and scikit-learn to run this fork.
-DJINN also uses numpy, matplotlib, and cPickle.
-Sphinx is required to view the html documentation.
+Original DJINN required TensorFlow. This fork is implemented with PyTorch.
 
-Note that the sklearn version used when training a DJINN model must be
-the same version used when reloading/evaluating the saved model. 
+Requirements:
 
-To use this fork, clone the repo and install the primary runtime dependencies (example using pip):
+- Python 3.8+
+- PyTorch
+- scikit-learn
 
-    $ git clone https://github.com/bwhewe-13/DJINN.git
-    $ cd DJINN
-    $ python -m pip install --upgrade pip
-    $ python -m pip install torch scikit-learn numpy matplotlib
-    $ python -m pip install .
+Install from source:
+
+```bash
+git clone https://github.com/bwhewe-13/DJINN.git
+cd DJINN
+python -m pip install --upgrade pip
+python -m pip install .
+```
+
+Try it out using the examples in [examples](./examples):
+
+- `python examples/djinn_regression_example.py`
+- `python examples/djinn_classification_example.py`
+- `python examples/djinn_multiout_example.py`
+
+Notes:
+
+- The scikit-learn version used when training a DJINN model should match the
+    version used when loading/evaluating that saved model.
+- Some example workflows may require `matplotlib`:
+
+    ```bash
+    python -m pip install matplotlib
+    ```
 
 
-Try it out! 
-Examples for training DJINN models are included in the [examples](./examples) folder. 
+Development
+-----------
+Set up a local development environment:
 
- -python [djinn_example.py](./examples/djinn_example.py) (single output)
+```bash
+python -m pip install --upgrade pip
+python -m pip install -e .[dev]
+```
 
- -python [djinn_multiout_example.py](./examples/djinn_multiout_example.py) (multiple outputs)
+Run quality checks and tests:
 
+```bash
+black --check djinn tests examples
+isort --check-only djinn tests examples
+flake8
+pytest
+```
 
-For Mac users with Anaconda installs, it might be necessary to manually install matplotlib via pip:
+Enable pre-commit hooks (optional, recommended):
 
-    $ pip install matplotlib
+```bash
+pre-commit install
+pre-commit run --all-files
+```
 
+Build docs locally:
 
-If matplotlib will not import, try running "pythonw", for example: 
+```bash
+python -m pip install sphinx
+cd docs
+make html
+```
 
-    $ pythonw djinn_example.py
-    
 
 
 ### Documentation
-To view the DJINN documentation: 
+To view the DJINN documentation:
 
 ```
 cd docs
@@ -75,10 +109,10 @@ URL: http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8478232&isnumber=86
 
 
 
-Release 
+Release
 -----------
 Copyright (c) 2018, Lawrence Livermore National Security, LLC.
- 
+
 Produced at the Lawrence Livermore National Laboratory
 
 Written by K. Humbird (humbird1@llnl.gov), L. Peterson (peterson76@llnl.gov).
@@ -87,10 +121,9 @@ LLNL-CODE-754815   OCEC-18-117
 
 All rights reserved.
 
-Unlimited Open Source- BSD Distribution. 
+Unlimited Open Source- BSD Distribution.
 
 For release details and restrictions, please read the RELEASE, LICENSE, and NOTICE files, linked below:
 - [RELEASE](./RELEASE)
 - [LICENSE](./LICENSE)
 - [NOTICE](./NOTICE)
-
