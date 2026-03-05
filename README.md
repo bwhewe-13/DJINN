@@ -4,10 +4,11 @@ Deep Jointly-Informed Neural Networks
 **DJINN: Deep jointly-informed neural networks**
 
 
-[![Tests](https://github.com/bwhewe-13/DJINN/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/bwhewe-13/DJINN/actions/workflows/ci.yml)
+[![Tests](https://github.com/bwhewe-13/DJINN/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/bwhewe-13/DJINN/actions/workflows/tests.yml)
+[![Formatting](https://github.com/bwhewe-13/DJINN/actions/workflows/formatting.yml/badge.svg?branch=master)](https://github.com/bwhewe-13/DJINN/actions/workflows/formatting.yml)
 [![codecov](https://codecov.io/gh/bwhewe-13/DJINN/branch/master/graph/badge.svg)](https://codecov.io/gh/bwhewe-13/DJINN)
-[![Documentation Status](https://github.com/bwhewe-13/DJINN/actions/workflows/docs.yml/badge.svg?branch=master)](https://github.com/bwhewe-13/DJINN/actions/workflows/docs.yml)
-![License](https://img.shields.io/github/license/bwhewe-13/DJINN)
+[![Docs](https://github.com/bwhewe-13/DJINN/actions/workflows/docs.yml/badge.svg?branch=master)](https://github.com/bwhewe-13/DJINN/actions/workflows/docs.yml)
+[![License: BSD](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/bwhewe-13/DJINN/blob/master/LICENSE)
 ![Python](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)
 
 

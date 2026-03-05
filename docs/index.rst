@@ -1,6 +1,6 @@
 .. #
 .. # Copyright (c) 2018, Lawrence Livermore National Security, LLC.
-.. # 
+.. #
 .. # Produced at the Lawrence Livermore National Laboratory
 .. #
 .. # Written by K. Humbird (humbird1@llnl.gov), L. Peterson (peterson76@llnl.gov).
@@ -11,7 +11,7 @@
 .. #
 .. # This file is part of DJINN.
 .. #
-.. # For details, see github.com/LLNL/djinn. 
+.. # For details, see github.com/LLNL/djinn.
 .. #
 .. # For details about use and distribution, please read DJINN/LICENSE .
 .. #
@@ -23,15 +23,15 @@
 DJINN: Deep Jointly-Informed Neural Networks's documentation!
 =============================================================
 Building djinn regression models with
-tensorflow and sklearn.
+PyTorch and sklearn.
 
 Example
 -------
 .. code-block:: python
 
     # Basic usage: fit a regression model & predict something new
-    from djinn import djinn
-    model = djinn.DJINN_Regressor()
+   from djinn import DJINN_Regressor
+   model = DJINN_Regressor()
     model.fit(X,y)
     y_new = model.predict(x_new)
 
@@ -65,5 +65,3 @@ License & Usage
 .. toctree::
    djinn_license
    :maxdepth: 1
-
-

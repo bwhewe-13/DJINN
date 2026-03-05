@@ -23,7 +23,6 @@ including hyperparameter selection, model training, Bayesian prediction, and
 loading/saving of serialized DJINN models.
 """
 
-
 import json
 from pathlib import Path
 

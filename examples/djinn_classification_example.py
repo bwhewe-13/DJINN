@@ -30,7 +30,6 @@ including hyperparameter selection, training, inference, model reload,
 continued training, and prediction collection.
 """
 
-
 import sklearn
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
