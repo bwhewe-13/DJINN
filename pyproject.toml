@@ -43,7 +43,7 @@ testing = ["pytest>=7", "pytest-cov"]
 dev = [
     "pytest>=7",
     "pytest-cov",
-    "black",
+    "black==26.1.0",
     "isort",
     "flake8",
     "pre-commit",
