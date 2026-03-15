@@ -727,7 +727,7 @@ def train_single_tree(model, loader, criterion, optimizer, xtest, ytest, epochs)
     return model, train_history, valid_history
 
 
-def save_tree_model(model, tree_idx, ttn, model_dir):
+def save_tree_model(model, tree_idx, ttn, model_dir, weights=None, biases=None):
     """Persist one trained tree-model checkpoint to disk.
 
     Parameters
@@ -740,13 +740,42 @@ def save_tree_model(model, tree_idx, ttn, model_dir):
         Tree-to-network mapping dictionary containing ``network_shape``.
     model_dir : pathlib.Path
         Directory where the checkpoint is written.
+    weights : dict or None, optional
+        Layer weights keyed by ``h1..hN`` and ``out``.
+    biases : dict or None, optional
+        Layer biases keyed by ``h1..hN`` and ``out``.
     """
     save_path = model_dir / f"tree_{tree_idx}.pt"
+
+    network_shapes = ttn["network_shape"]
+    if tree_idx in network_shapes:
+        tree_network_shape = network_shapes[tree_idx]
+    else:
+        tree_key = f"tree_{tree_idx}"
+        legacy_tree_key = f"tree{tree_idx}"
+        if tree_key in network_shapes:
+            tree_network_shape = network_shapes[tree_key]
+        elif legacy_tree_key in network_shapes:
+            tree_network_shape = network_shapes[legacy_tree_key]
+        else:
+            raise KeyError(
+                f"Missing network shape for tree index {tree_idx}. "
+                f"Expected one of: {tree_idx}, '{tree_key}', '{legacy_tree_key}'."
+            )
+
+    if weights is not None and biases is not None:
+        network_shape_payload = {
+            "shape": tree_network_shape,
+            "weights": weights,
+            "biases": biases,
+        }
+    else:
+        network_shape_payload = tree_network_shape
 
     torch.save(
         {
             "state_dict": model.state_dict(),
-            "network_shape": ttn["network_shape"][tree_idx],
+            "network_shape": network_shape_payload,
         },
         save_path,
     )
@@ -878,6 +907,7 @@ def torch_dropout_regression(
         "initial_biases": {},
         "final_weights": {},
         "final_biases": {},
+        "model_dir": None,
     }
 
     # Scale data and split into train/test sets
@@ -893,6 +923,7 @@ def torch_dropout_regression(
 
     if save_model or save_files:
         model_dir = get_unique_model_name(model_path)
+        nninfo["model_dir"] = str(model_dir)
 
     all_train_history = []
     all_valid_history = []
@@ -929,7 +960,7 @@ def torch_dropout_regression(
         nninfo["final_biases"][keys] = dense_biases
 
         if save_model:
-            save_tree_model(model, idx, ttn, model_dir)
+            save_tree_model(model, idx, ttn, model_dir, weights=weights, biases=biases)
 
         all_train_history.append(train_hist)
         all_valid_history.append(valid_hist)
@@ -1049,10 +1080,45 @@ def load_tree_model(checkpoint_path, device, dropout_keep_prob, tree_idx):
             checkpoint_path, map_location=device, weights_only=False
         )
 
-    # Rebuild model from saved structure
+    # Rebuild model from saved structure. Older checkpoints may store only the
+    # layer-size array in ``network_shape``; derive init tensors from state_dict
+    # in that case so model loading remains backward compatible.
     network_shape = checkpoint["network_shape"]
-    weights = network_shape["weights"]
-    biases = network_shape["biases"]
+    if (
+        isinstance(network_shape, dict)
+        and "weights" in network_shape
+        and "biases" in network_shape
+    ):
+        weights = network_shape["weights"]
+        biases = network_shape["biases"]
+    else:
+        state_dict = checkpoint["state_dict"]
+        weights = {}
+        biases = {}
+
+        hidden_idx = 0
+        while f"hidden_layers.{hidden_idx}.weight" in state_dict:
+            layer_key = f"h{hidden_idx + 1}"
+            weights[layer_key] = (
+                state_dict[f"hidden_layers.{hidden_idx}.weight"]
+                .detach()
+                .cpu()
+                .numpy()
+                .T
+            )
+            biases[layer_key] = (
+                state_dict[f"hidden_layers.{hidden_idx}.bias"].detach().cpu().numpy()
+            )
+            hidden_idx += 1
+
+        weights["out"] = state_dict["output_layer.weight"].detach().cpu().numpy().T
+        biases["out"] = state_dict["output_layer.bias"].detach().cpu().numpy()
+
+        network_shape = {
+            "shape": network_shape,
+            "weights": weights,
+            "biases": biases,
+        }
 
     model = MultiLayerPerceptron(
         weights,

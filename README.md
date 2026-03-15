@@ -21,7 +21,7 @@ For additional information, refer to the paper "Deep neural network initializati
 
 
 Getting Started
------------
+---------------
 Original DJINN required TensorFlow. This fork is implemented with PyTorch.
 
 Requirements:
@@ -89,8 +89,6 @@ cd docs
 make html
 ```
 
-
-
 ### Documentation
 To view the DJINN documentation:
 
@@ -99,6 +97,45 @@ cd docs
 make html
 ```
 Open docs/_build/html/index.html in a browser
+
+
+Source Verification
+-------------------
+
+These are tests done to make sure that this fork is in agreement with the original
+TensorFlow DJINN implementation.
+
+### One-time setup
+Run `setup_envs.sh` to create both virtual environments:
+
+```bash
+bash setup_envs.sh
+```
+
+This creates:
+- `venvs/tf-djinn/`  — TensorFlow implementation
+- `venvs/pt-djinn/`  — PyTorch implementation
+
+### Step 1 — Unit tests (run in both envs)
+
+These tests check API compatibility, output shapes, determinism, and
+save/load correctness. Run them independently in each environment:
+
+```bash
+# TensorFlow env
+source venvs/tf-djinn/bin/activate
+pytest tests/test_unit_shared.py -v
+deactivate
+
+# PyTorch env
+source venvs/pt-djinn/bin/activate
+pytest tests/test_unit_shared.py -v
+deactivate
+```
+
+Any test that fails in one environment but passes in the other reveals
+a **behavioral divergence** between the two implementations.
+
 
 
 Source Repo

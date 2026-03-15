@@ -16,6 +16,15 @@
 # For details about use and distribution, please read DJINN/LICENSE .
 ###############################################################################
 
-from .main import DJINN_Classifier, DJINN_Regressor
+"""DJINN public package interface.
 
-__all__ = ["DJINN_Regressor", "DJINN_Classifier"]
+This package exports the high-level :mod:`djinn.djinn` module, which contains
+the public regression/classification APIs and model persistence helpers.
+
+Modules
+-------
+djinn
+        Public model classes and loading helpers.
+"""
+
+__all__ = ["djinn"]

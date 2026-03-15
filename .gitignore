@@ -13,6 +13,7 @@ __pycache__/
 
 env/
 build/
+venvs/
 
 # Sphinx documentation
 docs/_build/

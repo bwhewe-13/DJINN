@@ -24,6 +24,7 @@ loading/saving of serialized DJINN models.
 """
 
 import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -166,7 +167,7 @@ class DJINN_Regressor:
         Returns
         -------
         dict
-            Dictionary with keys ``batch_size``, ``learn_rate``, and
+            Dictionary with keys ``batch_size``, ``learning_rate``, and
             ``epochs``.
         """
         if X.ndim == 1:
@@ -195,7 +196,7 @@ class DJINN_Regressor:
         )
 
         print("Finding optimal hyper-parameters...")
-        nn_batch_size, learnrate, nn_epochs = get_hyperparams(
+        nn_batch_size, learning_rate, nn_epochs = get_hyperparams(
             self.__regression,
             tree_to_network,
             self.__xscale,
@@ -209,8 +210,11 @@ class DJINN_Regressor:
 
         return {
             "batch_size": nn_batch_size,
-            "learn_rate": learnrate,
+            "learning_rate": learning_rate,
+            # Backward-compatible alias used by older callers/tests.
+            "learn_rate": learning_rate,
             "epochs": nn_epochs,
+            "ntrees": self.__n_trees,
         }
 
     def train(
@@ -218,14 +222,17 @@ class DJINN_Regressor:
         X,
         Y,
         epochs=1000,
-        learn_rate=0.001,
+        learning_rate=0.001,
+        learn_rate=None,
         batch_size=0,
         weight_decay=1.0e-8,
         save_files=True,
         save_model=True,
         model_name="djinn_model",
         model_path="./",
+        ntrees=None,
         seed=None,
+        random_state=None,
     ):
         """Train DJINN with specified hyperparameters.
 
@@ -241,8 +248,10 @@ class DJINN_Regressor:
             Target array for training.
         epochs : int, optional
             Number of training epochs.
-        learn_rate : float, optional
+        learning_rate : float, optional
             Learning rate for weight and bias optimization.
+        learn_rate : float or None, optional
+            Backward-compatible alias for ``learning_rate``.
         batch_size : int, optional
             Number of samples per batch. If ``0``, uses 5% of the dataset.
         weight_decay : float, optional
@@ -268,6 +277,15 @@ class DJINN_Regressor:
         -------
         None
         """
+        if random_state is not None and seed is None:
+            seed = random_state
+
+        if learn_rate is not None:
+            learning_rate = learn_rate
+
+        if ntrees is not None:
+            self.__n_trees = int(ntrees)
+
         self.model_name = model_name
         self.model_path = model_path
 
@@ -307,7 +325,7 @@ class DJINN_Regressor:
             X,
             Y,
             ntrees=self.__n_trees,
-            lr=learn_rate,
+            lr=learning_rate,
             n_epochs=epochs,
             batch_size=batch_size,
             dropout_keep_prob=self.__dropout_keep_prob,
@@ -321,6 +339,14 @@ class DJINN_Regressor:
         )
 
         if save_model:
+            saved_model_dir = self.nninfo.get("model_dir") if self.nninfo else None
+            if saved_model_dir:
+                saved_model_dir = Path(saved_model_dir)
+                self.model_name = saved_model_dir.name
+                self.model_path = str(saved_model_dir.parent)
+
+            # Load freshly trained checkpoints so predict() works immediately.
+            self.load_model(self.model_name, self.model_path)
             self._save_json()
 
     def fit(
@@ -328,6 +354,7 @@ class DJINN_Regressor:
         X,
         Y,
         epochs=None,
+        learning_rate=None,
         learn_rate=None,
         batch_size=None,
         weight_decay=1.0e-8,
@@ -339,7 +366,7 @@ class DJINN_Regressor:
     ):
         """Train DJINN, auto-selecting hyperparameters when not supplied.
 
-        If ``learn_rate`` is None, calls :meth:`get_hyperparameters` first
+        If ``learning_rate`` is None, calls :meth:`get_hyperparameters` first
         and uses the returned values before delegating to :meth:`train`.
 
         Parameters
@@ -350,9 +377,11 @@ class DJINN_Regressor:
             Target array for training.
         epochs : int or None, optional
             Number of training epochs.
-        learn_rate : float or None, optional
+        learning_rate : float or None, optional
             Learning rate for weight and bias optimization. If ``None``,
             hyperparameters are tuned automatically.
+        learn_rate : float or None, optional
+            Backward-compatible alias for ``learning_rate``.
         batch_size : int or None, optional
             Number of samples per batch.
         weight_decay : float, optional
@@ -372,9 +401,12 @@ class DJINN_Regressor:
         -------
         None
         """
-        if learn_rate is None:
+        if learn_rate is not None and learning_rate is None:
+            learning_rate = learn_rate
+
+        if learning_rate is None:
             optimal = self.get_hyperparameters(X, Y, weight_decay, seed)
-            learn_rate = optimal["learn_rate"]
+            learning_rate = optimal["learning_rate"]
             batch_size = optimal["batch_size"]
             epochs = optimal["epochs"]
 
@@ -382,7 +414,7 @@ class DJINN_Regressor:
             X=X,
             Y=Y,
             epochs=epochs,
-            learn_rate=learn_rate,
+            learning_rate=learning_rate,
             batch_size=batch_size,
             weight_decay=weight_decay,
             save_files=save_files,
@@ -424,18 +456,28 @@ class DJINN_Regressor:
         xscale = MinMaxScaler()
         xscale.data_min_ = np.array(state["xscale"]["data_min_"])
         xscale.data_max_ = np.array(state["xscale"]["data_max_"])
-        xscale.scale_ = xscale.data_max_ - xscale.data_min_
-        xscale.data_range_ = xscale.scale_.copy()
-        xscale.min_ = -xscale.data_min_ / xscale.scale_
+        xscale.data_range_ = xscale.data_max_ - xscale.data_min_
+        xscale.scale_ = np.divide(
+            1.0,
+            xscale.data_range_,
+            out=np.zeros_like(xscale.data_range_, dtype=float),
+            where=xscale.data_range_ != 0,
+        )
+        xscale.min_ = -xscale.data_min_ * xscale.scale_
         xscale.n_features_in_ = xscale.data_min_.shape[0]
         obj._DJINN_Regressor__xscale = xscale
 
         yscale = MinMaxScaler()
         yscale.data_min_ = np.array(state["yscale"]["data_min_"])
         yscale.data_max_ = np.array(state["yscale"]["data_max_"])
-        yscale.scale_ = yscale.data_max_ - yscale.data_min_
-        yscale.data_range_ = yscale.scale_.copy()
-        yscale.min_ = -yscale.data_min_ / yscale.scale_
+        yscale.data_range_ = yscale.data_max_ - yscale.data_min_
+        yscale.scale_ = np.divide(
+            1.0,
+            yscale.data_range_,
+            out=np.zeros_like(yscale.data_range_, dtype=float),
+            where=yscale.data_range_ != 0,
+        )
+        yscale.min_ = -yscale.data_min_ * yscale.scale_
         yscale.n_features_in_ = yscale.data_min_.shape[0]
         obj._DJINN_Regressor__yscale = yscale
 
@@ -460,13 +502,15 @@ class DJINN_Regressor:
         """
         model_dir = Path(model_path) / model_name
 
-        self.__models = {}
+        models = {}
         for tree_idx in range(self.__n_trees):
             checkpoint_path = model_dir / f"tree_{tree_idx}.pt"
             model, _ = load_tree_model(
                 checkpoint_path, self.device, self.__dropout_keep_prob, tree_idx
             )
-            self.__models[tree_idx] = model
+            models[tree_idx] = model
+
+        self.__models = models
 
     def close_model(self):
         """Release all loaded PyTorch models from memory.
@@ -569,6 +613,81 @@ class DJINN_Regressor:
         """
         return self.bayesian_predict(x_test, None, seed)
 
+    def bma_predict(self, x_test, n_iters=100, seed=None):
+        """Return Bayesian model averaging samples and summary statistics.
+
+        Parameters
+        ----------
+        x_test : ndarray
+            Input feature matrix for testing.
+        n_iters : int, optional
+            Number of stochastic forward passes per tree.
+        seed : int or None, optional
+            Random seed for reproducibility.
+
+        Returns
+        -------
+        dict
+            Dictionary containing percentile summaries and stacked prediction
+            samples under ``predictions`` with shape
+            ``(n_iters * n_trees, n_test, n_outputs)``.
+        """
+        lower, middle, upper, samples = self.bayesian_predict(x_test, n_iters, seed)
+        preds = self.collect_tree_predictions(samples["predictions"])
+        return {
+            "lower": lower,
+            "middle": middle,
+            "upper": upper,
+            "predictions": preds,
+        }
+
+    def save(self, model_path):
+        """Persist the currently loaded model under an explicit output path.
+
+        Parameters
+        ----------
+        model_path : str or pathlib.Path
+            Target base path. Writes checkpoints to ``<model_path>/`` and
+            metadata to ``<model_path>.json``.
+
+        Returns
+        -------
+        pathlib.Path
+            Saved model directory path.
+        """
+        target = Path(model_path)
+        target_dir = target
+        target_json = target.with_suffix(".json")
+
+        source_dir = Path(self.model_path) / self.model_name
+        if not source_dir.exists():
+            raise FileNotFoundError(f"Model directory not found: {source_dir}")
+
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        shutil.copytree(source_dir, target_dir)
+
+        state = {
+            "n_trees": self.__n_trees,
+            "tree_max_depth": self.__tree_max_depth,
+            "dropout_keep_prob": self.__dropout_keep_prob,
+            "regression": self.__regression,
+            "model_name": target_dir.name,
+            "model_path": str(target_dir.parent),
+            "xscale": {
+                "data_min_": self.__xscale.data_min_.tolist(),
+                "data_max_": self.__xscale.data_max_.tolist(),
+            },
+            "yscale": {
+                "data_min_": self.__yscale.data_min_.tolist(),
+                "data_max_": self.__yscale.data_max_.tolist(),
+            },
+        }
+        with open(target_json, "w") as f:
+            json.dump(state, f, indent=2)
+
+        return target_dir
+
     def collect_tree_predictions(self, predictions):
         """Gather and reshape the full distribution of per-tree predictions.
 
@@ -597,8 +716,9 @@ class DJINN_Regressor:
         X,
         Y,
         training_epochs,
-        learn_rate,
+        learning_rate,
         batch_size,
+        learn_rate=None,
         seed=None,
     ):
         """Continue training an existing model (must call :meth:`load_model` first).
@@ -614,8 +734,10 @@ class DJINN_Regressor:
             Target array for training.
         training_epochs : int
             Additional epochs to train.
-        learn_rate : float
+        learning_rate : float
             Learning rate.
+        learn_rate : float or None, optional
+            Backward-compatible alias for ``learning_rate``.
         batch_size : int
             Number of samples per batch.
         seed : int or None, optional
@@ -625,6 +747,9 @@ class DJINN_Regressor:
         -------
         None
         """
+        if learn_rate is not None:
+            learning_rate = learn_rate
+
         model_dir = Path(self.model_path) / self.model_name
 
         torch_continue_training(
@@ -634,7 +759,7 @@ class DJINN_Regressor:
             x=X,
             y=Y,
             ntrees=self.__n_trees,
-            lr=learn_rate,
+            lr=learning_rate,
             n_epochs=training_epochs,
             batch_size=batch_size,
             dropout_keep_prob=self.__dropout_keep_prob,
@@ -790,3 +915,14 @@ class DJINN_Classifier(DJINN_Regressor):
             Predicted class index for each test point, shape ``(n_test,)``.
         """
         return self.bayesian_predict(x_test, None, seed)
+
+
+def load(model_path):
+    """Load a saved DJINN model. Wraps from_json() + load_model()."""
+
+    path = Path(model_path)
+    # find the .json sidecar — could be path itself or path.json
+    json_path = path if path.suffix == ".json" else path.with_suffix(".json")
+    obj = DJINN_Regressor.from_json(json_path)
+    obj.load_model(obj.model_name, obj.model_path)
+    return obj
