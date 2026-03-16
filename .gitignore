@@ -32,3 +32,9 @@ coverage.xml
 
 # Tests
 .pytest_cache/
+
+# PT benchmark results - regenerated in CI, never committed
+results_pt.json
+
+# TF baseline - committed once, see README for regeneration instructions
+# results_tf.json

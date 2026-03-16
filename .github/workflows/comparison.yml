@@ -1,0 +1,107 @@
+# .github/workflows/comparison.yml
+#
+# Runs the TF vs PyTorch statistical comparison tests.
+# This is a SEPARATE workflow from your normal tests.yml so it doesn't
+# slow down every push. It triggers:
+#   - manually (workflow_dispatch)
+#   - on any push/PR that touches the djinn source or the test files
+#   - on a weekly schedule, so drift doesn't go unnoticed
+#
+# The TF baseline (results_tf.json) is committed to the repo root.
+# This job only needs to install PyTorch + your fork, regenerate
+# results_pt.json, then run pytest -m comparison.
+
+name: TF vs PyTorch Comparison
+
+on:
+  workflow_dispatch:   # run on demand from the Actions tab
+
+  push:
+    paths:
+      - "djinn/**"
+      - "tests/test_tf_comparison.py"
+      - "run_and_collect.py"
+      - "results_tf.json"
+
+  pull_request:
+    paths:
+      - "djinn/**"
+      - "tests/test_tf_comparison.py"
+
+  schedule:
+    - cron: "0 6 * * 1"   # every Monday at 06:00 UTC
+
+jobs:
+  compare:
+    name: Compare TF baseline vs PyTorch
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install PyTorch DJINN + test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+          pip install scipy matplotlib
+
+      - name: Verify results_tf.json is present
+        run: |
+          if [ ! -f results_tf.json ]; then
+            echo "::error::results_tf.json not found in repo root."
+            echo "Generate it once locally:"
+            echo "  source venvs/tf-djinn/bin/activate"
+            echo "  python run_and_collect.py --impl tf --out results_tf.json --seeds 20"
+            echo "  git add results_tf.json && git commit -m 'Add TF baseline results'"
+            exit 1
+          fi
+          echo "TF baseline found ($(wc -c < results_tf.json) bytes)"
+
+      - name: Generate PyTorch results
+        run: |
+          python run_and_collect.py \
+            --impl pt \
+            --out results_pt.json \
+            --seeds 20 \
+            --ntrees 3 \
+            --epochs 50
+
+      - name: Upload results as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: comparison-results-py${{ matrix.python-version }}
+          path: |
+            results_tf.json
+            results_pt.json
+          retention-days: 30
+
+      - name: Run comparison tests
+        run: |
+          pytest tests/test_tf_comparison.py -m comparison -v --tb=short
+
+      - name: Generate comparison report (optional)
+        if: always()   # run even if tests fail, so you get the plot
+        run: |
+          python compare_results.py \
+            --tf results_tf.json \
+            --pt results_pt.json \
+            --plot || true   # don't fail the job if matplotlib isn't available
+
+      - name: Upload comparison plot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comparison-plot-py${{ matrix.python-version }}
+          path: djinn_comparison.png
+          if-no-files-found: ignore
