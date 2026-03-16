@@ -99,8 +99,8 @@ make html
 Open docs/_build/html/index.html in a browser
 
 
-Source Verification
--------------------
+Source Repo Verification
+------------------------
 
 These are tests done to make sure that this fork is in agreement with the original
 TensorFlow DJINN implementation.
@@ -116,7 +116,7 @@ This creates:
 - `venvs/tf-djinn/`  — TensorFlow implementation
 - `venvs/pt-djinn/`  — PyTorch implementation
 
-### Step 1 — Unit tests (run in both envs)
+### Step 1: Unit tests (run in both envs)
 
 These tests check API compatibility, output shapes, determinism, and
 save/load correctness. Run them independently in each environment:
@@ -136,6 +136,60 @@ deactivate
 Any test that fails in one environment but passes in the other reveals
 a **behavioral divergence** between the two implementations.
 
+
+### Step 2: Collect benchmark results
+
+Run the benchmark script once in each environment. This trains DJINN
+across 20 random seeds and saves the metrics to JSON:
+
+```bash
+# TensorFlow env
+source venvs/tf-djinn/bin/activate
+python run_and_collect.py --impl tf --out results_tf.json --ntrees 3 --epochs 100
+deactivate
+
+# PyTorch env
+source venvs/pt-djinn/bin/activate
+python run_and_collect.py --impl pt --out results_pt.json --ntrees 3 --epochs 100
+deactivate
+```
+
+### Step 3: Compare results
+```bash
+python compare_results.py --tf results_tf.json --pt results_pt.json
+
+# Optional: generate distribution plots (requires matplotlib)
+python compare_results.py --tf results_tf.json --pt results_pt.json --plot
+```
+
+### Interpreting results
+
+| Color / Status | Meaning |
+|----------------|---------|
+| Green `PASS`   | Distributions are not significantly different (KS + Mann-Whitney p > 0.05) |
+| Yellow `WARN`  | Marginal difference - worth investigating but not necessarily a bug |
+| Red `FAIL`     | Statistically significant difference or metric below performance floor |
+
+#### Acceptance thresholds
+
+| Check                         | Threshold |
+|-------------------------------|-----------|
+| Network architecture          | Exact match |
+| Prediction shape/dtype        | Exact match |
+| Same-seed determinism         | rtol=1e-4 |
+| Save/load round-trip          | rtol=1e-5 |
+| Median R2 gap (regression)    | ≤ 0.05 |
+| Distribution KS / MW tests    | p > 0.05 |
+| BMA uncertainty > 0           | Required |
+---
+
+### Notes
+
+- The two implementations will **never produce identical outputs** —
+  TF and PyTorch have different RNGs and optimizer defaults.
+- The goal is statistical equivalence, not numerical identity.
+- If `--epochs` is too low, both implementations may underfit and
+  produce noisy results — use at least 50 epochs for meaningful comparison.
 
 
 Source Repo

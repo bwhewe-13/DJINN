@@ -338,15 +338,17 @@ class DJINN_Regressor:
             device=self.device,
         )
 
+        # Always load the live models into self.__models so predict() works
+        # immediately without needing files on disk.
+        if self.nninfo and "models" in self.nninfo:
+            self.__models = self.nninfo["models"]
+
         if save_model:
             saved_model_dir = self.nninfo.get("model_dir") if self.nninfo else None
             if saved_model_dir:
                 saved_model_dir = Path(saved_model_dir)
                 self.model_name = saved_model_dir.name
                 self.model_path = str(saved_model_dir.parent)
-
-            # Load freshly trained checkpoints so predict() works immediately.
-            self.load_model(self.model_name, self.model_path)
             self._save_json()
 
     def fit(
