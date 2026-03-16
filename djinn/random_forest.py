@@ -16,6 +16,13 @@
 # For details about use and distribution, please read DJINN/LICENSE .
 ###############################################################################
 
+"""Tree-to-network mapping utilities for DJINN random-forest initialization.
+
+This module contains helpers to train sklearn forests, extract tree structure,
+and convert each tree into the layer-width and weight matrices used to
+initialize DJINN neural networks.
+"""
+
 
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
@@ -430,6 +437,11 @@ def fill_weight_connections(
         New neuron indices for each layer.
     max_depth_feature : numpy.ndarray
         Maximum depth where each feature appears.
+
+    Returns
+    -------
+    None
+        Mutates ``djinn_weights`` in place.
     """
     # add_diagonal_connections(djinn_weights, max_depth_feature, nin, num_layers)
 
@@ -616,6 +628,11 @@ def connect_output_layer(djinn_weights, neurons_layer, num_layers):
         New neuron indices for each layer.
     num_layers : int
         Number of network layers.
+
+    Returns
+    -------
+    None
+        Updates the output-layer weights in place.
     """
     m = len(neurons_layer[-2])
     ind = np.where(abs(djinn_weights[num_layers - 3][:, -m:]) > 0)[0]

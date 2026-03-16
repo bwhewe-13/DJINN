@@ -16,11 +16,39 @@ from djinn import djinn
 
 
 def make_model():
+    """Construct a default DJINN regressor for tests.
+
+    Returns
+    -------
+    DJINN_Regressor
+        Fresh model instance.
+    """
     return djinn.DJINN_Regressor()
 
 
 def train(model, X, y, ntrees=1, epochs=5, seed=None):
-    """Train a model with optional random-state control for reproducibility."""
+    """Train a model with optional random-state control for reproducibility.
+
+    Parameters
+    ----------
+    model : DJINN_Regressor
+        Model to train.
+    X : numpy.ndarray
+        Training features.
+    y : numpy.ndarray
+        Training targets.
+    ntrees : int, optional
+        Number of trees to train.
+    epochs : int, optional
+        Number of epochs.
+    seed : int or None, optional
+        Reproducibility seed.
+
+    Returns
+    -------
+    None
+        Trains the model in place.
+    """
     kwargs = dict(ntrees=ntrees, epochs=epochs)
     if seed is not None:
         kwargs["random_state"] = seed
@@ -29,7 +57,13 @@ def train(model, X, y, ntrees=1, epochs=5, seed=None):
 
 @pytest.fixture(scope="module")
 def small_data():
-    """80-sample, 4-feature regression dataset for fast tests."""
+    """Provide a small single-output regression split for tests.
+
+    Returns
+    -------
+    tuple
+        ``(X_train, X_test, y_train, y_test)`` split arrays.
+    """
     rng = np.random.default_rng(42)
     X = rng.standard_normal((80, 4))
     y = (X[:, 0] + X[:, 1] ** 2).reshape(-1, 1)
@@ -38,7 +72,13 @@ def small_data():
 
 @pytest.fixture(scope="module")
 def multiout_data():
-    """80-sample, 4-feature, 2-output dataset."""
+    """Provide a small two-output regression split for tests.
+
+    Returns
+    -------
+    tuple
+        ``(X_train, X_test, y_train, y_test)`` split arrays.
+    """
     rng = np.random.default_rng(42)
     X = rng.standard_normal((80, 4))
     y = np.column_stack([X[:, 0] + X[:, 1], X[:, 2] - X[:, 3]])
@@ -47,7 +87,18 @@ def multiout_data():
 
 @pytest.fixture(scope="module")
 def trained_model(small_data):
-    """Return a trained model reused across tests without custom training."""
+    """Build and train a reusable model fixture.
+
+    Parameters
+    ----------
+    small_data : tuple
+        Fixture containing train/test arrays.
+
+    Returns
+    -------
+    DJINN_Regressor
+        Trained model instance.
+    """
     X_train, _, y_train, _ = small_data
     model = make_model()
     train(model, X_train, y_train, ntrees=1, epochs=5, seed=0)

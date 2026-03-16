@@ -29,7 +29,14 @@ DEFAULT_SEED = 42
 
 @pytest.fixture(scope="session")
 def regression_data():
-    """Diabetes dataset, split and scaled — single output."""
+    """Provide a scaled single-output regression dataset.
+
+    Returns
+    -------
+    tuple
+        ``(X_train, X_test, y_train, y_test)`` arrays from the diabetes
+        dataset.
+    """
     X, y = load_diabetes(return_X_y=True)
     y = y.reshape(-1, 1)
     X_train, X_test, y_train, y_test = train_test_split(
@@ -46,7 +53,13 @@ def regression_data():
 
 @pytest.fixture(scope="session")
 def multiout_regression_data():
-    """Synthetic multi-output regression dataset."""
+    """Provide a synthetic multi-output regression dataset.
+
+    Returns
+    -------
+    tuple
+        ``(X_train, X_test, y_train, y_test)`` arrays for a two-target task.
+    """
     rng = np.random.default_rng(DEFAULT_SEED)
     X = rng.standard_normal((300, 6))
     # Two outputs with different linear relationships
@@ -64,7 +77,14 @@ def multiout_regression_data():
 
 @pytest.fixture(scope="session")
 def classification_data():
-    """Iris dataset, split — multi-class classification."""
+    """Provide an Iris multi-class classification split.
+
+    Returns
+    -------
+    tuple
+        ``(X_train, X_test, y_train, y_test)`` where targets are one-hot
+        encoded.
+    """
     X, y = load_iris(return_X_y=True)
     y_onehot = np.eye(3)[y]  # one-hot encode for DJINN
     X_train, X_test, y_train, y_test = train_test_split(
@@ -75,7 +95,13 @@ def classification_data():
 
 @pytest.fixture(scope="session")
 def small_data():
-    """Tiny dataset for fast unit tests."""
+    """Provide a small regression dataset for fast tests.
+
+    Returns
+    -------
+    tuple
+        ``(X_train, X_test, y_train, y_test)`` arrays for lightweight tests.
+    """
     rng = np.random.default_rng(DEFAULT_SEED)
     X = rng.standard_normal((60, 4))
     y = (X[:, 0] + X[:, 1] ** 2).reshape(-1, 1)
@@ -91,7 +117,20 @@ def small_data():
 
 
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    """Return a dict of regression metrics."""
+    """Compute standard regression metrics.
+
+    Parameters
+    ----------
+    y_true : numpy.ndarray
+        Ground-truth target values.
+    y_pred : numpy.ndarray
+        Predicted target values.
+
+    Returns
+    -------
+    dict
+        Dictionary containing ``mse``, ``mae``, and ``r2``.
+    """
     from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
     return {
@@ -103,7 +142,13 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_test_output_files():
-    """Remove DJINN model artifacts created during tests after session ends."""
+    """Remove DJINN model artifacts created during the test session.
+
+    Yields
+    ------
+    None
+        Runs test session first, then performs cleanup in teardown.
+    """
     root = Path(__file__).resolve().parents[1]
     targets = [root, root / "tests"]
 

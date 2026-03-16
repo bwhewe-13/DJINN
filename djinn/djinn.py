@@ -920,7 +920,18 @@ class DJINN_Classifier(DJINN_Regressor):
 
 
 def load(model_path):
-    """Load a saved DJINN model. Wraps from_json() + load_model()."""
+    """Load a saved DJINN model from path.
+
+    Parameters
+    ----------
+    model_path : str or pathlib.Path
+        Path to the model directory or its JSON sidecar.
+
+    Returns
+    -------
+    DJINN_Regressor
+        Reconstructed model with checkpoints loaded.
+    """
 
     path = Path(model_path)
     # find the .json sidecar — could be path itself or path.json

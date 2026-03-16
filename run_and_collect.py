@@ -85,7 +85,20 @@ def _fit(impl, model, X, y, epochs, seed):
 
 
 def _metrics(y_true, y_pred):
-    """Compute regression metrics for true and predicted targets."""
+    """Compute regression metrics for true and predicted targets.
+
+    Parameters
+    ----------
+    y_true : ndarray
+        Ground-truth targets.
+    y_pred : ndarray
+        Predicted targets.
+
+    Returns
+    -------
+    dict
+        Dictionary containing ``mse``, ``mae``, and ``r2``.
+    """
     return {
         "mse": float(mean_squared_error(y_true, y_pred)),
         "mae": float(mean_absolute_error(y_true, y_pred)),
@@ -94,7 +107,25 @@ def _metrics(y_true, y_pred):
 
 
 def scale(X_train, X_test, y_train, y_test):
-    """Min-max scale train/test features and targets."""
+    """Min-max scale train/test features and targets.
+
+    Parameters
+    ----------
+    X_train : ndarray
+        Training feature matrix.
+    X_test : ndarray
+        Test feature matrix.
+    y_train : ndarray
+        Training targets.
+    y_test : ndarray
+        Test targets.
+
+    Returns
+    -------
+    tuple
+        Scaled ``X_train``, ``X_test``, ``y_train``, ``y_test``, and the
+        fitted target scaler.
+    """
     sx, sy = MinMaxScaler(), MinMaxScaler()
     return (
         sx.fit_transform(X_train),
@@ -363,7 +394,13 @@ def cleanup(keep_files=("results_tf.json", "results_pt.json")):
 
 
 def main():
-    """Run benchmark collection and write consolidated JSON results."""
+    """Run benchmark collection and write consolidated JSON results.
+
+    Returns
+    -------
+    None
+        Writes the output JSON file and prints progress.
+    """
     parser = argparse.ArgumentParser(description="Collect DJINN benchmark results")
     parser.add_argument(
         "--impl",

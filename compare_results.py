@@ -31,7 +31,21 @@ def _supports_color():
 
 
 def _colorize(text, code):
-    """Wrap text in ANSI color codes when color output is enabled."""
+    """Wrap text in ANSI color codes when color output is enabled.
+
+    Parameters
+    ----------
+    text : str
+        Plain text to colorize.
+    code : str
+        ANSI color code string.
+
+    Returns
+    -------
+    str
+        Colorized text when ANSI output is supported, otherwise the original
+        text.
+    """
     if not _supports_color():
         return text
     return f"\033[{code}m{text}\033[0m"
@@ -43,14 +57,44 @@ FAIL = _colorize("FAIL", "31")
 
 
 def section(title):
-    """Print a formatted section header."""
+    """Print a formatted section header.
+
+    Parameters
+    ----------
+    title : str
+        Section title text.
+
+    Returns
+    -------
+    None
+        This function prints output and returns nothing.
+    """
     print(f"\n{'='*60}")
     print(f"  {title}")
     print(f"{'='*60}")
 
 
 def row(label, tf_val, pt_val, result, note=""):
-    """Print one formatted comparison row."""
+    """Print one formatted comparison row.
+
+    Parameters
+    ----------
+    label : str
+        Name of the compared metric.
+    tf_val : str
+        TensorFlow value to display.
+    pt_val : str
+        PyTorch value to display.
+    result : str
+        Status marker (for example PASS/WARN/FAIL).
+    note : str, optional
+        Optional note appended to the row.
+
+    Returns
+    -------
+    None
+        This function prints output and returns nothing.
+    """
     print(f"  {label:<28} TF={tf_val:>10}  PT={pt_val:>10}  {result}  {note}")
 
 
@@ -68,7 +112,19 @@ def mannwhitney(a, b, alpha=0.05):
 
 
 def summary_stats(values):
-    """Return mean/std/min/max/median statistics for a sequence."""
+    """Return summary statistics for a numeric sequence.
+
+    Parameters
+    ----------
+    values : Sequence[float]
+        Numeric values to summarize.
+
+    Returns
+    -------
+    dict
+        Dictionary containing ``mean``, ``std``, ``min``, ``max``, and
+        ``median``.
+    """
     arr = np.array(values)
     return {
         "mean": round(float(arr.mean()), 5),
@@ -81,7 +137,20 @@ def summary_stats(values):
 
 # comparison checks
 def compare_regression(tf_data, pt_data):
-    """Compare single-output regression metrics between TF and PyTorch."""
+    """Compare single-output regression metrics between TF and PyTorch.
+
+    Parameters
+    ----------
+    tf_data : list[dict]
+        TensorFlow regression result records.
+    pt_data : list[dict]
+        PyTorch regression result records.
+
+    Returns
+    -------
+    None
+        Prints a formatted comparison report.
+    """
     section("1. Single-Output Regression (Diabetes Dataset)")
 
     for metric in ("r2", "mse", "mae"):
@@ -132,7 +201,20 @@ def compare_regression(tf_data, pt_data):
 
 
 def compare_multiout(tf_data, pt_data):
-    """Compare multi-output regression metrics between TF and PyTorch."""
+    """Compare multi-output regression metrics between TF and PyTorch.
+
+    Parameters
+    ----------
+    tf_data : list[dict]
+        TensorFlow multi-output result records.
+    pt_data : list[dict]
+        PyTorch multi-output result records.
+
+    Returns
+    -------
+    None
+        Prints a formatted comparison report.
+    """
     section("2. Multi-Output Regression (Synthetic Dataset)")
 
     for metric in ("r2", "mse"):
@@ -150,7 +232,20 @@ def compare_multiout(tf_data, pt_data):
 
 
 def compare_bma(tf_data, pt_data):
-    """Compare Bayesian model averaging uncertainty behavior."""
+    """Compare Bayesian model averaging uncertainty behavior.
+
+    Parameters
+    ----------
+    tf_data : list[dict]
+        TensorFlow BMA result records.
+    pt_data : list[dict]
+        PyTorch BMA result records.
+
+    Returns
+    -------
+    None
+        Prints a formatted comparison report.
+    """
     section("3. BMA Uncertainty Estimates")
 
     tf_unc = [r["mean_uncertainty"] for r in tf_data]
@@ -192,7 +287,20 @@ def compare_bma(tf_data, pt_data):
 
 
 def compare_hyperparams(tf_data, pt_data):
-    """Compare selected hyperparameter distributions across implementations."""
+    """Compare selected hyperparameter distributions across implementations.
+
+    Parameters
+    ----------
+    tf_data : list[dict]
+        TensorFlow hyperparameter records.
+    pt_data : list[dict]
+        PyTorch hyperparameter records.
+
+    Returns
+    -------
+    None
+        Prints a formatted comparison report.
+    """
     section("4. Hyperparameter Values")
 
     keys = set(tf_data[0].keys()) & set(pt_data[0].keys())
@@ -222,7 +330,20 @@ def compare_hyperparams(tf_data, pt_data):
 
 
 def compare_architecture(tf_arch, pt_arch):
-    """Compare architecture metadata and prediction interface details."""
+    """Compare architecture metadata and prediction interface details.
+
+    Parameters
+    ----------
+    tf_arch : dict
+        TensorFlow architecture summary.
+    pt_arch : dict
+        PyTorch architecture summary.
+
+    Returns
+    -------
+    None
+        Prints a formatted comparison report.
+    """
     section("5. Network Architecture & Prediction Shape/Dtype")
 
     # prediction shape
@@ -325,7 +446,20 @@ def compare_architecture(tf_arch, pt_arch):
 
 
 def compare_training_time(tf_data, pt_data):
-    """Report training-time differences between implementations."""
+    """Report training-time differences between implementations.
+
+    Parameters
+    ----------
+    tf_data : list[dict]
+        TensorFlow regression result records.
+    pt_data : list[dict]
+        PyTorch regression result records.
+
+    Returns
+    -------
+    None
+        Prints a timing summary.
+    """
     section("6. Training Speed")
 
     tf_times = [r["train_time_s"] for r in tf_data]
@@ -344,7 +478,14 @@ def compare_training_time(tf_data, pt_data):
 
 
 def main():
-    """Parse CLI arguments, load result files, and run all comparisons."""
+    """Parse CLI arguments, load result files, and run all comparisons.
+
+    Returns
+    -------
+    None
+        Exits the process with an error message when required files are
+        missing.
+    """
     parser = argparse.ArgumentParser(description="Compare TF vs PT DJINN results")
     parser.add_argument("--tf", required=True, help="Path to results_tf.json")
     parser.add_argument("--pt", required=True, help="Path to results_pt.json")
@@ -397,7 +538,20 @@ def main():
 
 
 def _make_plots(tf_results, pt_results):
-    """Generate side-by-side distribution plots for core regression metrics."""
+    """Generate side-by-side distribution plots for core regression metrics.
+
+    Parameters
+    ----------
+    tf_results : dict
+        TensorFlow benchmark results dictionary.
+    pt_results : dict
+        PyTorch benchmark results dictionary.
+
+    Returns
+    -------
+    None
+        Saves a PNG image when matplotlib is available.
+    """
     try:
         import matplotlib.pyplot as plt
     except ImportError:

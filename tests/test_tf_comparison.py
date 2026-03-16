@@ -195,7 +195,18 @@ class TestBMAEquivalence:
     """Bayesian model averaging uncertainty and shape consistency checks."""
 
     def test_pt_bma_uncertainty_is_nonzero(self, results):
-        """PT must report non-zero predictive uncertainty for all seeds."""
+        """PT must report non-zero predictive uncertainty for all seeds.
+
+        Parameters
+        ----------
+        results : tuple
+            Tuple of loaded TF/PT results fixtures.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
         _, pt = results
         uncertainties = [r["mean_uncertainty"] for r in pt["bma"]]
         assert all(
@@ -203,7 +214,18 @@ class TestBMAEquivalence:
         ), "PT BMA produced zero uncertainty for at least one seed"
 
     def test_tf_bma_uncertainty_is_nonzero(self, results):
-        """TF baseline must also report non-zero predictive uncertainty."""
+        """TF baseline must also report non-zero predictive uncertainty.
+
+        Parameters
+        ----------
+        results : tuple
+            Tuple of loaded TF/PT results fixtures.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
         tf, _ = results
         uncertainties = [r["mean_uncertainty"] for r in tf["bma"]]
         assert all(
@@ -226,7 +248,18 @@ class TestBMAEquivalence:
         )
 
     def test_bma_shape_has_multiple_samples(self, results):
-        """BMA sample tensors must contain more than one draw."""
+        """BMA sample tensors must contain more than one draw.
+
+        Parameters
+        ----------
+        results : tuple
+            Tuple of loaded TF/PT results fixtures.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
         _, pt = results
         for r in pt["bma"]:
             shape = r.get("bma_shape", [])
@@ -250,14 +283,36 @@ class TestHyperparameterConsistency:
     """Sanity checks for tuned hyperparameter ranges and agreement."""
 
     def test_learning_rate_in_reasonable_range(self, results):
-        """PT learning rates must stay inside a conservative valid interval."""
+        """PT learning rates must stay inside a conservative valid interval.
+
+        Parameters
+        ----------
+        results : tuple
+            Tuple of loaded TF/PT results fixtures.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
         _, pt = results
         lrs = [r["learning_rate"] for r in pt["hyperparams"] if "learning_rate" in r]
         for lr in lrs:
             assert 1e-6 <= lr <= 1.0, f"Learning rate {lr} is outside [1e-6, 1.0]"
 
     def test_epochs_in_reasonable_range(self, results):
-        """PT epoch counts must stay inside an expected tuning range."""
+        """PT epoch counts must stay inside an expected tuning range.
+
+        Parameters
+        ----------
+        results : tuple
+            Tuple of loaded TF/PT results fixtures.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
         _, pt = results
         epochs = [r["epochs"] for r in pt["hyperparams"]]
         for e in epochs:
@@ -282,7 +337,18 @@ class TestArchitectureEquivalence:
     """Prediction interface and architecture metadata compatibility checks."""
 
     def test_predict_shapes_match(self, results):
-        """Single- and multi-sample prediction shapes must match exactly."""
+        """Single- and multi-sample prediction shapes must match exactly.
+
+        Parameters
+        ----------
+        results : tuple
+            Tuple of loaded TF/PT results fixtures.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
         tf, pt = results
         tf_arch = tf.get("architecture", {})
         pt_arch = pt.get("architecture", {})
@@ -300,7 +366,18 @@ class TestArchitectureEquivalence:
         )
 
     def test_predict_dtype_compatible(self, results):
-        """Prediction dtypes must both be floating-point."""
+        """Prediction dtypes must both be floating-point.
+
+        Parameters
+        ----------
+        results : tuple
+            Tuple of loaded TF/PT results fixtures.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
         tf, pt = results
         tf_arch = tf.get("architecture", {})
         pt_arch = pt.get("architecture", {})
@@ -314,7 +391,18 @@ class TestArchitectureEquivalence:
         ), f"Non-float predict dtype: TF={tf_dtype}, PT={pt_dtype}"
 
     def test_io_dimensions_match(self, results):
-        """Input/output dimensional metadata must match between TF and PT."""
+        """Input/output dimensional metadata must match between TF and PT.
+
+        Parameters
+        ----------
+        results : tuple
+            Tuple of loaded TF/PT results fixtures.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
         tf, pt = results
         tf_arch = tf.get("architecture", {})
         pt_arch = pt.get("architecture", {})
@@ -329,7 +417,18 @@ class TestArchitectureEquivalence:
         )
 
     def test_n_trees_matches(self, results):
-        """Ensemble tree counts must match between TF and PT metadata."""
+        """Ensemble tree counts must match between TF and PT metadata.
+
+        Parameters
+        ----------
+        results : tuple
+            Tuple of loaded TF/PT results fixtures.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
         tf, pt = results
         tf_arch = tf.get("architecture", {})
         pt_arch = pt.get("architecture", {})

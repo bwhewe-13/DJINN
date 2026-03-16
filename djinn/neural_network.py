@@ -90,7 +90,13 @@ def scale_data(x, y, xscale, yscale, regression, seed, n_classes, test=False):
 
 
 class MultiLayerPerceptron(nn.Module):
-    """Feed-forward network initialized from DJINN tree-mapped weights."""
+    """Feed-forward network initialized from DJINN tree-mapped weights.
+
+    Notes
+    -----
+    Hidden layers and output layer are rebuilt from per-layer weight and bias
+    dictionaries produced by DJINN tree-to-network mapping.
+    """
 
     def __init__(self, weights, biases, dropout_keep_prob):
         """Initialize the network.

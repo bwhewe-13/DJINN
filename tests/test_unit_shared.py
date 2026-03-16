@@ -19,11 +19,33 @@ from djinn import djinn
 
 
 def make_model():
+    """Construct a default DJINN regressor for shared tests.
+
+    Returns
+    -------
+    DJINN_Regressor
+        Fresh model instance.
+    """
     return djinn.DJINN_Regressor()
 
 
 def fit(model, X, y):
-    """Call whichever training method this implementation exposes."""
+    """Train using whichever method the active backend exposes.
+
+    Parameters
+    ----------
+    model : DJINN_Regressor
+        Model instance to train.
+    X : numpy.ndarray
+        Training features.
+    y : numpy.ndarray
+        Training targets.
+
+    Returns
+    -------
+    None
+        Trains the model in place.
+    """
     if hasattr(model, "train"):
         model.train(X, y)
     else:
