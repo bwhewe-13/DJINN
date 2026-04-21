@@ -53,18 +53,21 @@ def _make_model(impl, ntrees):
 def _fit(impl, model, X, y, epochs, seed):
     """Train the model using the correct API for each implementation.
 
-    PT:  train() with save_model=False to suppress file I/O during benchmarks.
-    TF:  fit() with no extra kwargs — ntrees is already set on __init__,
-         and fit() auto-selects hyperparameters then calls train() internally.
-         Pass epochs and random_state only if the TF fit() accepts them;
-         since TF fit() takes no args, call train() directly with learn_rate
-         from get_hyperparameters().
+    Both PT and TF use get_hyperparameters() to auto-tune learning rate and
+    batch size, ensuring a fair comparison. PT suppresses file I/O during
+    benchmarks via save_model=False / save_files=False.
+
+    TF:  fit() takes no kwargs, so get_hyperparameters + train are called
+         directly to control epochs and seed.
     """
     if impl == "pt":
+        optimal = model.get_hyperparameters(X, y, seed=seed)
         model.train(
             X,
             y,
             epochs=epochs,
+            learning_rate=optimal["learning_rate"],
+            batch_size=optimal["batch_size"],
             save_model=False,
             save_files=False,
             seed=seed,
