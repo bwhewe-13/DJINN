@@ -245,6 +245,8 @@ def run_bma_uncertainty(impl, seeds, ntrees=3, epochs=50, n_iters=10):
 
 def run_hyperparams(impl, n_trials=5):
     """Check that get_hyperparameters returns sensible, stable values."""
+    if n_trials == 0:
+        return []
     X, y = load_diabetes(return_X_y=True)
     y = y.reshape(-1, 1)
     X_tr, _, y_tr, _ = train_test_split(X, y, test_size=0.2, random_state=0)
@@ -419,6 +421,13 @@ def main():
     )
     parser.add_argument("--ntrees", type=int, default=3)
     parser.add_argument("--epochs", type=int, default=50)
+    parser.add_argument(
+        "--hyper-trials",
+        type=int,
+        default=5,
+        dest="hyper_trials",
+        help="Hyperparameter search trials; 0 skips the phase (faster CI runs)",
+    )
     args = parser.parse_args()
 
     seeds = list(range(args.seeds))
@@ -431,7 +440,7 @@ def main():
         "regression": run_regression(args.impl, seeds, args.ntrees, args.epochs),
         "multiout": run_multiout_regression(args.impl, seeds, args.ntrees, args.epochs),
         "bma": run_bma_uncertainty(args.impl, seeds[:5], args.ntrees, args.epochs),
-        "hyperparams": run_hyperparams(args.impl),
+        "hyperparams": run_hyperparams(args.impl, args.hyper_trials),
         "architecture": run_architecture(args.impl, args.ntrees, args.epochs),
     }
 

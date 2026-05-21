@@ -23,7 +23,6 @@ and convert each tree into the layer-width and weight matrices used to
 initialize DJINN neural networks.
 """
 
-
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import MinMaxScaler

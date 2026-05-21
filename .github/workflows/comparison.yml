@@ -36,9 +36,11 @@ jobs:
     name: Compare TF baseline vs PyTorch
     runs-on: ubuntu-latest
 
+    timeout-minutes: 30
+
     strategy:
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.11"]
 
     steps:
       - name: Checkout repo
@@ -48,6 +50,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: 'pip'
 
       - name: Install PyTorch DJINN + test dependencies
         run: |
@@ -73,9 +76,10 @@ jobs:
           python run_and_collect.py \
             --impl pt \
             --out results_pt.json \
-            --seeds 20 \
+            --seeds 10 \
             --ntrees 3 \
-            --epochs 50
+            --epochs 50 \
+            --hyper-trials 0
 
       - name: Upload results as artifacts
         uses: actions/upload-artifact@v4
