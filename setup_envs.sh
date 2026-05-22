@@ -62,7 +62,7 @@ source "$VENV_DIR/pt-djinn/bin/activate"
 
 pip install --upgrade pip --quiet
 pip install torch scikit-learn scipy numpy matplotlib pytest --quiet
-pip install -e "$PT_REPO" --quiet
+pip install -e "$PT_REPO[dev]" --quiet
 
 echo "Installed packages (pt-djinn):"
 pip list | grep -E "tensorflow|torch|djinn|sklearn|scipy|numpy"

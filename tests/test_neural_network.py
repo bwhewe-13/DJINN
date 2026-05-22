@@ -418,7 +418,7 @@ def test_torch_continue_training_runs_and_writes_metadata(tmp_path, monkeypatch)
         checkpoint_path,
     )
 
-    def safe_json_dump(obj, fp, indent=4):
+    def safe_json_dump(obj, fp, indent=4, **kwargs):
         serializable = json.loads(
             json.dumps(obj, default=lambda o: np.asarray(o).tolist())
         )

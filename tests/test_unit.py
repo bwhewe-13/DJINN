@@ -51,7 +51,7 @@ def train(model, X, y, ntrees=1, epochs=5, seed=None):
     """
     kwargs = dict(ntrees=ntrees, epochs=epochs)
     if seed is not None:
-        kwargs["random_state"] = seed
+        kwargs["seed"] = seed
     model.train(X, y, **kwargs)
 
 
