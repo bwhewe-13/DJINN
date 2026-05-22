@@ -41,9 +41,12 @@ python -m pip install .
 
 Try it out using the examples in [examples](./examples):
 
-- `python examples/djinn_regression_example.py`
-- `python examples/djinn_classification_example.py`
-- `python examples/djinn_multiout_example.py`
+```bash
+cd examples
+python djinn_regression.py
+python djinn_classification.py
+python djinn_multiout.py
+```
 
 Notes:
 

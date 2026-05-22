@@ -133,10 +133,14 @@ class DJINN_Regressor:
                 "data_min_": self.__xscale.data_min_.tolist(),
                 "data_max_": self.__xscale.data_max_.tolist(),
             },
-            "yscale": {
-                "data_min_": self.__yscale.data_min_.tolist(),
-                "data_max_": self.__yscale.data_max_.tolist(),
-            },
+            "yscale": (
+                {
+                    "data_min_": self.__yscale.data_min_.tolist(),
+                    "data_max_": self.__yscale.data_max_.tolist(),
+                }
+                if self.__yscale is not None
+                else None
+            ),
         }
         with open(json_path, "w") as f:
             json.dump(state, f, indent=2)
@@ -232,7 +236,6 @@ class DJINN_Regressor:
         model_path="./",
         ntrees=None,
         seed=None,
-        random_state=None,
     ):
         """Train DJINN with specified hyperparameters.
 
@@ -277,9 +280,6 @@ class DJINN_Regressor:
         -------
         None
         """
-        if random_state is not None and seed is None:
-            seed = random_state
-
         if learn_rate is not None:
             learning_rate = learn_rate
 
@@ -469,19 +469,22 @@ class DJINN_Regressor:
         xscale.n_features_in_ = xscale.data_min_.shape[0]
         obj._DJINN_Regressor__xscale = xscale
 
-        yscale = MinMaxScaler()
-        yscale.data_min_ = np.array(state["yscale"]["data_min_"])
-        yscale.data_max_ = np.array(state["yscale"]["data_max_"])
-        yscale.data_range_ = yscale.data_max_ - yscale.data_min_
-        yscale.scale_ = np.divide(
-            1.0,
-            yscale.data_range_,
-            out=np.zeros_like(yscale.data_range_, dtype=float),
-            where=yscale.data_range_ != 0,
-        )
-        yscale.min_ = -yscale.data_min_ * yscale.scale_
-        yscale.n_features_in_ = yscale.data_min_.shape[0]
-        obj._DJINN_Regressor__yscale = yscale
+        if state["yscale"] is not None:
+            yscale = MinMaxScaler()
+            yscale.data_min_ = np.array(state["yscale"]["data_min_"])
+            yscale.data_max_ = np.array(state["yscale"]["data_max_"])
+            yscale.data_range_ = yscale.data_max_ - yscale.data_min_
+            yscale.scale_ = np.divide(
+                1.0,
+                yscale.data_range_,
+                out=np.zeros_like(yscale.data_range_, dtype=float),
+                where=yscale.data_range_ != 0,
+            )
+            yscale.min_ = -yscale.data_min_ * yscale.scale_
+            yscale.n_features_in_ = yscale.data_min_.shape[0]
+            obj._DJINN_Regressor__yscale = yscale
+        else:
+            obj._DJINN_Regressor__yscale = None
 
         return obj
 
@@ -680,10 +683,14 @@ class DJINN_Regressor:
                 "data_min_": self.__xscale.data_min_.tolist(),
                 "data_max_": self.__xscale.data_max_.tolist(),
             },
-            "yscale": {
-                "data_min_": self.__yscale.data_min_.tolist(),
-                "data_max_": self.__yscale.data_max_.tolist(),
-            },
+            "yscale": (
+                {
+                    "data_min_": self.__yscale.data_min_.tolist(),
+                    "data_max_": self.__yscale.data_max_.tolist(),
+                }
+                if self.__yscale is not None
+                else None
+            ),
         }
         with open(target_json, "w") as f:
             json.dump(state, f, indent=2)

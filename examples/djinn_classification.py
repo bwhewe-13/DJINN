@@ -39,8 +39,6 @@ import djinn
 
 def main():
     """Execute the end-to-end classification example workflow."""
-    print(sklearn.__version__)
-
     # Load the data, split into training/testing groups
     d = datasets.load_iris()
     X = d.data
@@ -50,8 +48,9 @@ def main():
         X, Y, test_size=0.2, random_state=1
     )
 
-    print("djinn example")
+    print("DJINN Example")
     modelname = "class_djinn_test"  # name the model
+    modeldump = "tmp-djinn-classification"  # output folder
     ntrees = 1  # number of trees = number of neural nets in ensemble
     maxdepth = 4  # max depth of tree -- optimize this for each data set
     dropout_keep = 1.0  # dropout typically set to 1 for non-Bayesian models
@@ -61,7 +60,7 @@ def main():
 
     # find optimal settings: this function returns dict with hyper-parameters
     # each djinn function accepts random seeds for reproducible behavior
-    optimal = model.get_hyperparameters(x_train, y_train, random_state=1)
+    optimal = model.get_hyperparameters(x_train, y_train, seed=1)
     batchsize = optimal["batch_size"]
     learnrate = optimal["learn_rate"]
     epochs = optimal["epochs"]
@@ -73,12 +72,11 @@ def main():
         epochs=epochs,
         learn_rate=learnrate,
         batch_size=batchsize,
-        display_step=1,
         save_files=True,
-        file_name=modelname,
         save_model=True,
         model_name=modelname,
-        random_state=1,
+        model_path=modeldump,
+        seed=1,
     )
 
     # *note there is a function model.fit(x_train,y_train, ... ) that wraps
@@ -95,14 +93,15 @@ def main():
     print("Accuracy", acc)
 
     # close model
+    saved_modelname = model.model_name
     model.close_model()
 
     print("Reload model and continue training")
     # reload model; can also open it using cPickle.load()
-    model2 = djinn.load(model_name="class_djinn_test")
+    model2 = djinn.load(f"{modeldump}/{saved_modelname}")
 
     # continue training for 20 epochs using same learning rate, etc as before
-    model2.continue_training(x_train, y_train, 20, learnrate, batchsize, random_state=1)
+    model2.continue_training(x_train, y_train, 20, learnrate, batchsize, seed=1)
 
     # make updated predictions
     # m2 = model2.predict(x_test)
@@ -113,7 +112,7 @@ def main():
 
     # Bayesian formulation with dropout. Recommend dropout keep
     # probability ~0.95, 5-10 trees.
-    print("Bayesian djinn example")
+    print("\nBayesian DJINN Example")
     ntrees = 3
     dropout_keep = 0.95
     modelname = "class_bdjinn_test"
@@ -125,20 +124,17 @@ def main():
     bmodel.fit(
         x_train,
         y_train,
-        display_step=1,
         save_files=True,
-        file_name=modelname,
         save_model=True,
         model_name=modelname,
-        random_state=1,
+        model_path=modeldump,
+        seed=1,
     )
 
     # evaluate: niters is the number of times you evaluate the network for
     # a single sample. higher niters = better resolved distribution of predictions
     niters = 100
-    bl, bm, bu, results = bmodel.bayesian_predict(
-        x_test, n_iters=niters, random_state=1
-    )
+    bl, bm, bu, results = bmodel.bayesian_predict(x_test, n_iters=niters, seed=1)
     # bayesian_predict returns 25, 50, 75 percentile and results dict with
     # all predictions
 

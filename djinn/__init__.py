@@ -27,4 +27,6 @@ djinn
         Public model classes and loading helpers.
 """
 
-__all__ = ["djinn"]
+from djinn.djinn import DJINN_Classifier, DJINN_Regressor, load
+
+__all__ = ["djinn", "DJINN_Regressor", "DJINN_Classifier", "load"]

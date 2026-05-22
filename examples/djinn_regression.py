@@ -16,7 +16,7 @@
 # For details about use and distribution, please read DJINN/LICENSE .
 ###############################################################################
 
-"""Run DJINN regression examples on the Boston housing dataset.
+"""Run DJINN regression examples on the California housing dataset.
 
 This script demonstrates standard and Bayesian regression workflows,
 including hyperparameter selection, training, inference, model reload,
@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 ###############################################################################
 # Demo script for DJINN
 # Below, each function available in DJINN is demonstrated for the
-# Boston housing dataset. Please see comments and djinn docs for
+# California housing dataset. Please see comments and djinn docs for
 # details on each function.
 ###############################################################################
 import numpy as np
@@ -40,26 +40,25 @@ import djinn
 
 
 def main():
-    """Execute the end-to-end regression example workflow."""
-    print(sklearn.__version__)
+    """Execute the end-to-end regression example workflow.
 
+    NOTE: for the California housing data in this script's setup
+    (80/20 split with random_state=1), typical test metrics are often
+    in the rough ranges MSE~0.3-0.9, Mean Abs Err~0.35-0.7,
+    Exp.Var.~0.5-0.85 when using get_hyperparameters().
+    Exact values vary with library versions and random seeds.
     """
-        NOTE: for the boston housing data you can expect test
-        MSE~10-20, Mean Abs Err~3-4, Exp.Var.~0.8+
-        when using get_hyperparameters() function
-    """
-
     # Load the data, split into training/testing groups
-    d = datasets.load_boston()
+    d = datasets.fetch_california_housing()
     X = d.data
     Y = d.target
 
     x_train, x_test, y_train, y_test = train_test_split(
         X, Y, test_size=0.2, random_state=1
     )
-
-    print("djinn example")
+    print("DJINN Example")
     modelname = "reg_djinn_test"  # name the model
+    modeldump = "tmp-djinn-regression"  # output folder
     ntrees = 1  # number of trees = number of neural nets in ensemble
     maxdepth = 4  # max depth of tree -- optimize this for each data set
     dropout_keep = 1.0  # dropout typically set to 1 for non-Bayesian models
@@ -69,7 +68,7 @@ def main():
 
     # find optimal settings: this function returns dict with hyper-parameters
     # each djinn function accepts random seeds for reproducible behavior
-    optimal = model.get_hyperparameters(x_train, y_train, random_state=1)
+    optimal = model.get_hyperparameters(x_train, y_train, seed=1)
     batchsize = optimal["batch_size"]
     learnrate = optimal["learn_rate"]
     epochs = optimal["epochs"]
@@ -81,12 +80,11 @@ def main():
         epochs=epochs,
         learn_rate=learnrate,
         batch_size=batchsize,
-        display_step=1,
         save_files=True,
-        file_name=modelname,
         save_model=True,
         model_name=modelname,
-        random_state=1,
+        model_path=modeldump,
+        seed=1,
     )
 
     # *note there is a function model.fit(x_train,y_train, ... ) that wraps
@@ -107,14 +105,15 @@ def main():
     print("Expl. Var.", exvar)
 
     # close model
+    saved_modelname = model.model_name
     model.close_model()
 
     print("Reload model and continue training for 20 epochs")
     # reload model; can also open it using cPickle.load()
-    model2 = djinn.load(model_name="reg_djinn_test")
+    model2 = djinn.load(f"{modeldump}/{saved_modelname}")
 
     # continue training for 20 epochs using same learning rate, etc as before
-    model2.continue_training(x_train, y_train, 20, learnrate, batchsize, random_state=1)
+    model2.continue_training(x_train, y_train, 20, learnrate, batchsize, seed=1)
 
     # make updated predictions
     m2 = model2.predict(x_test)
@@ -129,7 +128,7 @@ def main():
 
     # Bayesian formulation with dropout. Recommend dropout keep
     # probability ~0.95, 5-10 trees.
-    print("Bayesian djinn example")
+    print("\nBayesian DJINN Example")
     ntrees = 3
     dropout_keep = 0.95
     modelname = "reg_bdjinn_test"
@@ -141,20 +140,18 @@ def main():
     bmodel.fit(
         x_train,
         y_train,
-        display_step=1,
         save_files=True,
-        file_name=modelname,
         save_model=True,
         model_name=modelname,
-        random_state=1,
+        model_path=modeldump,
+        seed=1,
     )
 
     # evaluate: niters is the number of times you evaluate the network for
     # a single sample. higher niters = better resolved distribution of predictions
     niters = 100
-    bl, bm, bu, results = bmodel.bayesian_predict(
-        x_test, n_iters=niters, random_state=1
-    )
+    bl, bm, bu, results = bmodel.bayesian_predict(x_test, n_iters=niters, seed=1)
+    bl, bm, bu = bl.squeeze(), bm.squeeze(), bu.squeeze()
     # bayesian_predict returns 25, 50, 75 percentile and results dict with
     # all predictions
 
@@ -171,7 +168,7 @@ def main():
     fig, axs = plt.subplots(1, 1, figsize=(8, 8), facecolor="w", edgecolor="k")
     fig.subplots_adjust(hspace=0.15, wspace=0.1)
     axs.scatter(y_test, bm, linewidth=0, s=6, alpha=0.8, c="#68d1ca")
-    yerr = np.hstack((bm - bl, bu - bm)).T
+    yerr = np.vstack((bm - bl, bu - bm))
 
     a, b, c = axs.errorbar(
         y_test, bm, yerr=yerr, marker="", ls="", zorder=0, alpha=0.5, ecolor="black"

@@ -30,26 +30,29 @@ import matplotlib.pyplot as plt
 ###############################################################################
 import numpy as np
 import sklearn.datasets
+import sklearn.metrics
 from sklearn.model_selection import train_test_split
 
 import djinn
 
 
 def main():
-    """Execute the multi-output regression example workflow."""
-    # For the boston housing data you can expect final
-    # test MSE~10-20, Mean Abs Err~3-4, Exp.Var.~0.8+
-    # when using get_hyperparameters()
+    """Execute the multi-output regression example workflow.
 
+    For the California housing data you can expect final
+    test MSE~0.3-0.9, Mean Abs Err~0.35-0.7, Exp.Var.~0.5-0.85
+    when using get_hyperparameters()
+    """
     # Load the data, split into training/testing groups
-    d = sklearn.datasets.load_boston()
+    d = sklearn.datasets.fetch_california_housing()
     X = d.data
     Y = d.target
     Y = np.column_stack((Y, 0.5 * Y))  # make two columns of outputs
     x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.2)
 
-    print("Create DJINN model with multiple outputs")
+    print("DJINN Example Model with multiple outputs")
     modelname = "multireg_djinn_test"  # name the model
+    modeldump = "tmp-djinn-multiout"  # output folder
     ntrees = 1  # number of trees = number of neural nets in ensemble
     maxdepth = 4  # max depth of tree -- optimize this for each data set
     dropout_keep = 1.0  # dropout typically set to 1 for non-Bayesian models
@@ -70,11 +73,10 @@ def main():
         epochs=epochs,
         learn_rate=learnrate,
         batch_size=batchsize,
-        display_step=1,
         save_files=True,
-        file_name=modelname,
         save_model=True,
         model_name=modelname,
+        model_path=modeldump,
     )
 
     m = model.predict(x_test)
@@ -89,12 +91,13 @@ def main():
         print("Expl. Var.", exvar)
 
     # close model
+    saved_modelname = model.model_name
     model.close_model()
 
     print("Reload model and continue training for 50 epochs")
 
     # reload model and continue training for 50 more epochs
-    model2 = djinn.load(model_name="multireg_djinn_test")
+    model2 = djinn.load(f"{modeldump}/{saved_modelname}")
 
     model2.continue_training(x_train, y_train, 50, learnrate, batchsize)
 
@@ -127,11 +130,10 @@ def main():
         epochs=epochs,
         learn_rate=learnrate,
         batch_size=batchsize,
-        display_step=1,
         save_files=True,
-        file_name=modelname,
         save_model=True,
         model_name=modelname,
+        model_path=modeldump,
     )
 
     # evaluate
@@ -185,7 +187,7 @@ def main():
     axs.plot(g, g, color="red")
     plt.show()
 
-    print("test collect tree predictions fn")
+    print("Test Collect Tree Predictions fn")
     bmodel.collect_tree_predictions(results["predictions"])
 
 

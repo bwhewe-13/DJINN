@@ -30,6 +30,28 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """JSON encoder that serializes NumPy arrays as Python lists."""
+
+    def default(self, obj):
+        """Convert NumPy arrays to lists; delegate all other types to super.
+
+        Parameters
+        ----------
+        obj : object
+            The object to serialize.
+
+        Returns
+        -------
+        list or default
+            A Python list if ``obj`` is an ``ndarray``; otherwise the result
+            of the parent encoder's ``default`` method.
+        """
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+
 def scale_data(x, y, xscale, yscale, regression, seed, n_classes, test=False):
     """Scale data and split into a training subset.
 
@@ -1264,4 +1286,4 @@ def torch_continue_training(
         model_name = model_dir.name
 
     with open(model_dir / f"retrained_nn_info_{model_name}.json", "w") as file:
-        json.dump(nninfo, file, indent=4)
+        json.dump(nninfo, file, indent=4, cls=NumpyEncoder)

@@ -39,3 +39,8 @@ results_pt.json
 
 # TF baseline - committed once, see README for regeneration instructions
 # results_tf.json
+
+# Example output folders
+tmp-djinn-regression/
+tmp-djinn-classification/
+tmp-djinn-multiout/
