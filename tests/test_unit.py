@@ -26,7 +26,7 @@ def make_model():
     return djinn.DJINN_Regressor()
 
 
-def train(model, X, y, ntrees=1, epochs=5, seed=None):
+def train(model, X, y, ntrees=1, epochs=5, seed=None, model_path=None):
     """Train a model with optional random-state control for reproducibility.
 
     Parameters
@@ -43,15 +43,21 @@ def train(model, X, y, ntrees=1, epochs=5, seed=None):
         Number of epochs.
     seed : int or None, optional
         Reproducibility seed.
+    model_path : str or None, optional
+        Directory to save the model. When ``None``, saving is disabled so
+        parallel workers do not race over a shared directory.
 
     Returns
     -------
     None
         Trains the model in place.
     """
-    kwargs = dict(ntrees=ntrees, epochs=epochs)
+    save = model_path is not None
+    kwargs = dict(ntrees=ntrees, epochs=epochs, save_model=save, save_files=save)
     if seed is not None:
         kwargs["seed"] = seed
+    if model_path is not None:
+        kwargs["model_path"] = str(model_path)
     model.train(X, y, **kwargs)
 
 
@@ -287,7 +293,7 @@ class TestSaveLoad:
         """
         X_train, X_test, y_train, _ = small_data
         model = make_model()
-        train(model, X_train, y_train, ntrees=1, epochs=3, seed=0)
+        train(model, X_train, y_train, ntrees=1, epochs=3, seed=0, model_path=tmp_path)
         preds_before = model.predict(X_test)
 
         model.save(str(tmp_path / "test_model"))
@@ -318,7 +324,7 @@ class TestSaveLoad:
         """
         X_train, _, y_train, _ = small_data
         model = make_model()
-        train(model, X_train, y_train, ntrees=1, epochs=2)
+        train(model, X_train, y_train, ntrees=1, epochs=2, model_path=tmp_path)
         model.save(str(tmp_path / "test_model"))
         loaded = djinn.load(str(tmp_path / "test_model"))
         assert callable(getattr(loaded, "predict", None))

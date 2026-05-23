@@ -47,7 +47,7 @@ def fit(model, X, y):
         Trains the model in place.
     """
     if hasattr(model, "train"):
-        model.train(X, y)
+        model.train(X, y, save_model=False, save_files=False)
     else:
         model.fit(X, y)
 
