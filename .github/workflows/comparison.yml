@@ -33,7 +33,7 @@ jobs:
     name: Compare TF baseline vs PyTorch
     runs-on: ubuntu-latest
 
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     strategy:
       matrix:
@@ -73,7 +73,7 @@ jobs:
           python run_and_collect.py \
             --impl pt \
             --out results_pt.json \
-            --seeds 10 \
+            --seeds 20 \
             --ntrees 3 \
             --epochs 50 \
             --hyper-trials 0
