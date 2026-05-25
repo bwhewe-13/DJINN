@@ -236,6 +236,7 @@ class DJINN_Regressor:
         model_path="./",
         ntrees=None,
         seed=None,
+        eval_every=1,
     ):
         """Train DJINN with specified hyperparameters.
 
@@ -336,6 +337,7 @@ class DJINN_Regressor:
             model_path=str(Path(model_path) / model_name),
             seed=seed,
             device=self.device,
+            eval_every=eval_every,
         )
 
         # Always load the live models into self.__models so predict() works

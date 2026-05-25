@@ -240,7 +240,7 @@ def build_tree_weights_and_biases(ttn, key, seed=None, tree_idx=0):
     return weights, biases
 
 
-def prepare_dataloader(xtrain, ytrain, regression, batch_size, device):
+def prepare_dataloader(xtrain, ytrain, regression, batch_size, device, seed=None):
     """Create a shuffled PyTorch dataloader for regression or classification.
 
     Parameters
@@ -276,7 +276,10 @@ def prepare_dataloader(xtrain, ytrain, regression, batch_size, device):
         ytrain = ytrain.to(device)
 
     dataset = TensorDataset(xtrain, ytrain)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    generator = torch.Generator()
+    if seed is not None:
+        generator.manual_seed(seed)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=generator)
 
 
 def train_one_epoch(model, loader, criterion, optimizer):
@@ -728,7 +731,9 @@ def get_weights_and_biases(model):
     return dense_weights, dense_biases
 
 
-def train_single_tree(model, loader, criterion, optimizer, xtest, ytest, epochs):
+def train_single_tree(
+    model, loader, criterion, optimizer, xtest, ytest, epochs, eval_every=1
+):
     """Train a single tree-mapped network and track train/validation losses.
 
     Parameters
@@ -747,6 +752,10 @@ def train_single_tree(model, loader, criterion, optimizer, xtest, ytest, epochs)
         Validation targets.
     epochs : int
         Number of training epochs.
+    eval_every : int, optional
+        Evaluate the full validation set every this many epochs (default 1).
+        Values > 1 skip intermediate evaluations, reusing the last computed
+        val loss, which substantially reduces overhead for large epoch counts.
 
     Returns
     -------
@@ -757,10 +766,12 @@ def train_single_tree(model, loader, criterion, optimizer, xtest, ytest, epochs)
 
     train_history = []
     valid_history = []
+    val_loss = float("nan")
 
     for epoch in range(epochs):
         train_loss = train_one_epoch(model, loader, criterion, optimizer)
-        val_loss = evaluate(model, xtest, ytest, criterion)
+        if (epoch + 1) % eval_every == 0 or epoch == epochs - 1:
+            val_loss = evaluate(model, xtest, ytest, criterion)
 
         train_history.append(train_loss)
         valid_history.append(val_loss)
@@ -962,7 +973,10 @@ def torch_dropout_regression(
         weights, biases = build_tree_weights_and_biases(
             ttn, keys, seed=seed, tree_idx=idx
         )
-        loader = prepare_dataloader(xtrain, ytrain, regression, batch_size, device)
+        loader_seed = None if seed is None else seed * 1000 + idx
+        loader = prepare_dataloader(
+            xtrain, ytrain, regression, batch_size, device, seed=loader_seed
+        )
 
         # Create model and optimizer for this tree
         model = MultiLayerPerceptron(weights, biases, dropout_keep_prob).to(device)
@@ -981,7 +995,14 @@ def torch_dropout_regression(
 
         # Train model and record history
         model, train_hist, valid_hist = train_single_tree(
-            model, loader, criterion, optimizer, xtest, ytest, n_epochs
+            model,
+            loader,
+            criterion,
+            optimizer,
+            xtest,
+            ytest,
+            n_epochs,
+            eval_every=kwargs.get("eval_every", 1),
         )
 
         # Save final weights/biases

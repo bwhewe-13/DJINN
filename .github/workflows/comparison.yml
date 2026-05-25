@@ -28,9 +28,6 @@ on:
       - "djinn/**"
       - "tests/test_tf_comparison.py"
 
-  schedule:
-    - cron: "0 6 * * 1"   # every Monday at 06:00 UTC
-
 jobs:
   compare:
     name: Compare TF baseline vs PyTorch

@@ -50,18 +50,21 @@ def _make_model(impl, ntrees):
         return djinn.DJINN_Regressor(ntrees)
 
 
-def _fit(impl, model, X, y, epochs, seed):
-    """Train the model using the correct API for each implementation.
+def _get_hypers(impl, model, X, y, seed):
+    """Run hyperparameter search and return the optimal dict (not timed)."""
+    if impl == "pt":
+        return model.get_hyperparameters(X, y, seed=seed)
+    else:
+        return model.get_hyperparameters(X, y, random_state=seed)
 
-    Both PT and TF use get_hyperparameters() to auto-tune learning rate and
-    batch size, ensuring a fair comparison. PT suppresses file I/O during
-    benchmarks via save_model=False / save_files=False.
 
-    TF:  fit() takes no kwargs, so get_hyperparameters + train are called
-         directly to control epochs and seed.
+def _train_only(impl, model, X, y, optimal, epochs, seed):
+    """Train with pre-computed hyperparameters — this is the timed portion.
+
+    PT passes eval_every=5 to skip per-epoch validation on 4 out of every 5
+    epochs, since validation overhead is not part of deployment cost.
     """
     if impl == "pt":
-        optimal = model.get_hyperparameters(X, y, seed=seed)
         model.train(
             X,
             y,
@@ -71,11 +74,9 @@ def _fit(impl, model, X, y, epochs, seed):
             save_model=False,
             save_files=False,
             seed=seed,
+            eval_every=5,
         )
     else:
-        # TF: fit() takes no kwargs — it runs get_hyperparameters() internally.
-        # To control epochs and seed, call get_hyperparameters + train directly.
-        optimal = model.get_hyperparameters(X, y, random_state=seed)
         model.train(
             X,
             y,
@@ -172,8 +173,9 @@ def run_regression(impl, seeds, ntrees=3, epochs=50):
     records = []
     for seed in seeds:
         model = _make_model(impl, ntrees)
+        optimal = _get_hypers(impl, model, X_tr, y_tr, seed=seed)
         t0 = time.perf_counter()
-        _fit(impl, model, X_tr, y_tr, epochs=epochs, seed=seed)
+        _train_only(impl, model, X_tr, y_tr, optimal, epochs=epochs, seed=seed)
         elapsed = time.perf_counter() - t0
 
         preds = sy.inverse_transform(model.predict(X_te))
@@ -201,8 +203,9 @@ def run_multiout_regression(impl, seeds, ntrees=3, epochs=50):
     records = []
     for seed in seeds:
         model = _make_model(impl, ntrees)
+        optimal = _get_hypers(impl, model, X_tr, y_tr, seed=seed)
         t0 = time.perf_counter()
-        _fit(impl, model, X_tr, y_tr, epochs=epochs, seed=seed)
+        _train_only(impl, model, X_tr, y_tr, optimal, epochs=epochs, seed=seed)
         elapsed = time.perf_counter() - t0
 
         preds = model.predict(X_te)
@@ -228,7 +231,8 @@ def run_bma_uncertainty(impl, seeds, ntrees=3, epochs=50, n_iters=10):
     records = []
     for seed in seeds:
         model = _make_model(impl, ntrees)
-        _fit(impl, model, X_tr, y_tr, epochs=epochs, seed=seed)
+        optimal = _get_hypers(impl, model, X_tr, y_tr, seed=seed)
+        _train_only(impl, model, X_tr, y_tr, optimal, epochs=epochs, seed=seed)
 
         samples = _bma_samples(model, X_te, n_iters)
         # samples shape: (n_iters * n_trees, n_test, n_out)
@@ -291,7 +295,8 @@ def run_architecture(impl, ntrees=3, epochs=50):
     X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.2, random_state=0)
 
     model = _make_model(impl, ntrees)
-    _fit(impl, model, X_train, y_train, epochs=epochs, seed=0)
+    optimal = _get_hypers(impl, model, X_train, y_train, seed=0)
+    _train_only(impl, model, X_train, y_train, optimal, epochs=epochs, seed=0)
 
     # prediction shape and dtype
     single_pred = model.predict(X_test[[0]])

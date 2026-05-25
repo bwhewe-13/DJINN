@@ -221,7 +221,7 @@ pass/fail criteria used in CI.
 | Red `FAIL`     | Statistically significant difference or metric below performance floor |
 
 A `FAIL` in `compare_results.py` does **not** necessarily mean the PT
-implementation is wrong. PT often scores better than TF (higher R², lower
+implementation is wrong. PT often scores better than TF (higher R**2, lower
 MSE, lower variance across seeds), which also triggers a FAIL under two-sided
 tests. Use the pytest suite to determine whether a difference is a real
 regression.
