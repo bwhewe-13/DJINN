@@ -9,7 +9,7 @@ Deep Jointly-Informed Neural Networks
 [![codecov](https://codecov.io/gh/bwhewe-13/DJINN/branch/master/graph/badge.svg)](https://codecov.io/gh/bwhewe-13/DJINN)
 [![Docs](https://github.com/bwhewe-13/DJINN/actions/workflows/docs.yml/badge.svg?branch=master)](https://github.com/bwhewe-13/DJINN/actions/workflows/docs.yml)
 [![License: BSD](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/bwhewe-13/DJINN/blob/master/LICENSE)
-![Python](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)
+![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)
 
 
 Fork notice: This repository is a fork and continuation of LLNL's DJINN project (Deep Jointly-Informed Neural Networks) originally developed by Kelli D. Humbird (humbird1@llnl.gov). The original project is available at https://github.com/LLNL/djinn and is distributed under the license found in `LICENSE`. This fork is maintained by Ben Whewell (ben.whewell@pm.me) — https://github.com/bwhewe-13/DJINN
@@ -26,7 +26,7 @@ Original DJINN required TensorFlow. This fork is implemented with PyTorch.
 
 Requirements:
 
-- Python 3.8+
+- Python 3.10+
 - PyTorch
 - scikit-learn
 
