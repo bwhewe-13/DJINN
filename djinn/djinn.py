@@ -575,7 +575,10 @@ class DJINN_Regressor:
 
         for tree_idx in range(self.__n_trees):
             model = self.__models[tree_idx].to(self.device)
-            model.train()  # keep dropout active for Bayesian sampling
+            if non_bayes:
+                model.eval()  # single deterministic pass, no dropout
+            else:
+                model.train()  # keep dropout active for Bayesian sampling
 
             tree_preds = []
             with torch.no_grad():
@@ -880,7 +883,10 @@ class DJINN_Classifier(DJINN_Regressor):
 
         for tree_idx in range(n_trees):
             model = self._DJINN_Regressor__models[tree_idx].to(self.device)
-            model.train()  # keep dropout active for Bayesian sampling
+            if non_bayes:
+                model.eval()  # single deterministic pass, no dropout
+            else:
+                model.train()  # keep dropout active for Bayesian sampling
 
             tree_preds = []
             with torch.no_grad():
