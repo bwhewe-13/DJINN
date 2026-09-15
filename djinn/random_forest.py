@@ -89,7 +89,7 @@ def train_forest(X, Y, n_trees, max_depth, xscale, yscale, regression, seed=None
     rfr = RandomForestRegressor(
         n_trees,
         max_depth=max_depth,
-        bootstrap=False,
+        bootstrap=True,
         random_state=seed,
     )
 
