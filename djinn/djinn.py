@@ -651,7 +651,7 @@ class DJINN_Regressor:
             "predictions": preds,
         }
 
-    def save(self, model_path):
+    def save(self, model_path, overwrite=False):
         """Persist the currently loaded model under an explicit output path.
 
         Parameters
@@ -659,11 +659,20 @@ class DJINN_Regressor:
         model_path : str or pathlib.Path
             Target base path. Writes checkpoints to ``<model_path>/`` and
             metadata to ``<model_path>.json``.
+        overwrite : bool, optional
+            If ``True``, delete and replace ``model_path`` when it already
+            exists. Defaults to ``False``, which raises instead of silently
+            deleting an existing directory.
 
         Returns
         -------
         pathlib.Path
             Saved model directory path.
+
+        Raises
+        ------
+        FileExistsError
+            If ``model_path`` already exists and ``overwrite`` is ``False``.
         """
         target = Path(model_path)
         target_dir = target
@@ -674,6 +683,11 @@ class DJINN_Regressor:
             raise FileNotFoundError(f"Model directory not found: {source_dir}")
 
         if target_dir.exists():
+            if not overwrite:
+                raise FileExistsError(
+                    f"{target_dir} already exists. Pass overwrite=True to "
+                    "replace it."
+                )
             shutil.rmtree(target_dir)
         shutil.copytree(source_dir, target_dir)
 
