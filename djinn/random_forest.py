@@ -709,7 +709,7 @@ def map_single_tree_to_network(tree, nin, nout):
     return djinn_arch, djinn_weights
 
 
-def tree_to_nn_weights(regression, X, Y, num_trees, rfr, seed=False):
+def tree_to_nn_weights(regression, X, Y, num_trees, rfr, seed=None):
     """Map every tree in an ensemble to DJINN architecture and weights.
 
     Parameters
@@ -724,7 +724,7 @@ def tree_to_nn_weights(regression, X, Y, num_trees, rfr, seed=False):
         Number of trees to map.
     rfr : object
         Fitted sklearn forest-like estimator containing ``estimators_``.
-    seed : int or bool, default=False
+    seed : int or None, default=None
         Random seed used for deterministic initialization.
 
     Returns
@@ -734,7 +734,7 @@ def tree_to_nn_weights(regression, X, Y, num_trees, rfr, seed=False):
         and bias placeholders.
     """
     # Set random seed
-    if seed:
+    if seed is not None:
         np.random.seed(seed)
 
     # Get dimensions
