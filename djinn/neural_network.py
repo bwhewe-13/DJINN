@@ -552,13 +552,13 @@ def find_optimal_epochs(
     )
 
     accur = []
-    epoch = 0
     converged = False
 
-    epoch = 200
+    epoch = min(200, max_training_epochs)
     for _ in range(epoch):
         epoch_loss = train_one_epoch(model, loader, criterion, optimizer)
         accur.append(epoch_loss)
+    maxep = epoch
 
     while not converged and epoch < max_training_epochs:
         for _ in range(10):
