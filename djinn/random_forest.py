@@ -659,7 +659,21 @@ def map_single_tree_to_network(tree, nin, nout):
     -------
     tuple[numpy.ndarray, dict]
         Tuple ``(djinn_arch, djinn_weights)``.
+
+    Raises
+    ------
+    ValueError
+        If the tree's depth is too shallow (<= 1) to produce at least one
+        hidden layer.
     """
+    if tree.max_depth <= 1:
+        raise ValueError(
+            f"Tree has depth {tree.max_depth} (<= 1); DJINN needs trees "
+            "deep enough to produce at least one hidden layer. Increase "
+            "max_tree_depth or check whether the data is trivially "
+            "separable."
+        )
+
     # Extract tree structure
     tree_structure = extract_tree_structure(tree)
     node = build_node_dict(tree_structure)
