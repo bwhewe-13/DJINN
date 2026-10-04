@@ -3,7 +3,10 @@
 #
 # Produced at the Lawrence Livermore National Laboratory
 #
-# Written by K. Humbird (humbird1@llnl.gov), L. Peterson (peterson76@llnl.gov).
+# Originally written by K. Humbird (humbird1@llnl.gov), L. Peterson
+# (peterson76@llnl.gov).
+#
+# PyTorch rewrite: Copyright (c) 2024-2026, Ben Whewell.
 #
 # LLNL-CODE-754815
 #
