@@ -39,7 +39,7 @@ python -m pip install --upgrade pip
 python -m pip install .
 ```
 
-Try it out using the examples in [examples](./examples):
+Try it out using the examples in [examples](https://github.com/bwhewe-13/DJINN/tree/master/examples):
 
 ```bash
 cd examples
@@ -300,6 +300,6 @@ All rights reserved.
 Unlimited Open Source- BSD Distribution.
 
 For release details and restrictions, please read the RELEASE, LICENSE, and NOTICE files, linked below:
-- [RELEASE](./RELEASE)
-- [LICENSE](./LICENSE)
-- [NOTICE](./NOTICE)
+- [RELEASE](https://github.com/bwhewe-13/DJINN/blob/master/RELEASE)
+- [LICENSE](https://github.com/bwhewe-13/DJINN/blob/master/LICENSE)
+- [NOTICE](https://github.com/bwhewe-13/DJINN/blob/master/NOTICE)
