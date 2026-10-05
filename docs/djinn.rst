@@ -15,10 +15,3 @@ djinn
     :members:
     :undoc-members:
     :show-inheritance:
-
-djinn.main
-----------
-.. automodule:: djinn.main
-    :members:
-    :undoc-members:
-    :show-inheritance:

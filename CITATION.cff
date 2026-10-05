@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+message: >-
+  If you use DJINN in your research, please cite the paper below. To cite this
+  PyTorch implementation specifically, also cite the software.
+title: "DJINN: Deep Jointly-Informed Neural Networks (PyTorch)"
+type: software
+authors:
+  - given-names: Kelli D.
+    family-names: Humbird
+  - given-names: J. Luc
+    family-names: Peterson
+  - given-names: Ben
+    family-names: Whewell
+version: 1.1.1
+date-released: "2026-10-04"
+license: BSD-3-Clause
+repository-code: "https://github.com/bwhewe-13/DJINN"
+url: "https://github.com/bwhewe-13/DJINN"
+keywords:
+  - neural networks
+  - decision trees
+  - random forest
+  - regression
+  - pytorch
+preferred-citation:
+  type: article
+  title: "Deep Neural Network Initialization With Decision Trees"
+  authors:
+    - given-names: Kelli D.
+      family-names: Humbird
+    - given-names: J. Luc
+      family-names: Peterson
+    - given-names: Ryan G.
+      family-names: McClarren
+  journal: "IEEE Transactions on Neural Networks and Learning Systems"
+  volume: 30
+  issue: 5
+  start: 1286
+  end: 1295
+  year: 2019
+  month: 5
+  doi: "10.1109/TNNLS.2018.2869694"

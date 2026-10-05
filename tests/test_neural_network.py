@@ -121,6 +121,21 @@ def test_prepare_dataloader_regression_and_classification():
     assert yb2.dtype == torch.int64
 
 
+def test_prepare_dataloader_samples_full_batches_like_tf():
+    device = torch.device("cpu")
+    x = np.arange(21, dtype=np.float32).reshape(-1, 1)
+    y = np.arange(21, dtype=np.float32)
+
+    loader = nnf.prepare_dataloader(x, y, True, batch_size=4, device=device, seed=0)
+    batches = [xb for xb, _ in loader]
+    # TF DJINN draws len // batch_size full batches with replacement each epoch
+    assert len(batches) == 21 // 4
+    assert all(len(xb) == 4 for xb in batches)
+
+    again = nnf.prepare_dataloader(x, y, True, batch_size=4, device=device, seed=0)
+    assert all(torch.equal(a, b) for (a, _), b in zip(again, batches))
+
+
 def test_train_one_epoch_returns_float_loss():
     ttn = make_ttn_regression()
     weights, biases = nnf.build_tree_weights_and_biases(ttn, "tree_0")
