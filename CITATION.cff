@@ -11,8 +11,8 @@ authors:
     family-names: Peterson
   - given-names: Ben
     family-names: Whewell
-version: 1.1.1
-date-released: "2026-10-04"
+version: 1.1.2
+date-released: "2026-10-05"
 license: BSD-3-Clause
 repository-code: "https://github.com/bwhewe-13/DJINN"
 url: "https://github.com/bwhewe-13/DJINN"

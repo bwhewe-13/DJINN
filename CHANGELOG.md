@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-10-05
+
 ### Fixed
 
 - `get_hyperparameters(seed=...)` is now reproducible. The learning-rate
@@ -57,6 +59,7 @@ public API (`DJINN_Regressor`, `DJINN_Classifier`, `train`, `fit`, `predict`,
 - `find_optimal_epochs()` no longer crashes when `max_training_epochs <= 200`.
 - Trees too shallow to build a hidden layer raise a clear error.
 
-[Unreleased]: https://github.com/bwhewe-13/DJINN/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/bwhewe-13/DJINN/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/bwhewe-13/DJINN/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/bwhewe-13/DJINN/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/bwhewe-13/DJINN/releases/tag/v1.1.0
