@@ -303,6 +303,11 @@ def compare_hyperparams(tf_data, pt_data):
     """
     section("4. Hyperparameter Values")
 
+    # run_and_collect.py --hyper-trials 0 records an empty list
+    if not tf_data or not pt_data:
+        print("  Skipped: no hyperparameter records (run with --hyper-trials > 0)")
+        return
+
     keys = set(tf_data[0].keys()) & set(pt_data[0].keys())
     for key in sorted(keys):
         tf_vals = [r[key] for r in tf_data if key in r]
