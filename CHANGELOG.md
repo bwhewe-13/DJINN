@@ -15,6 +15,12 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Minibatches are now drawn the way the original TensorFlow DJINN draws
+  them: each epoch samples `len(X) // batch_size` full batches with
+  replacement, instead of a shuffled pass over every row. This closes a
+  ~0.02 R² gap to the TensorFlow baseline on the diabetes benchmark. Trained
+  models and selected hyperparameters will differ from 1.1.1 for the same
+  seed.
 - CI runs on Ubuntu 26.04 with Node 24 versions of the GitHub Actions.
 
 ## [1.1.1] - 2026-10-04
