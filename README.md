@@ -100,7 +100,7 @@ make html
 ```
 
 ### Documentation
-The documentation is hosted at https://bwhewe-13.github.io/DJINN/. To build it
+The documentation is hosted at https://www.ben-whewell.com/DJINN/. To build it
 locally, run `make html` in `docs/` and open `docs/_build/html/index.html`.
 
 Release notes are in [CHANGELOG.md](https://github.com/bwhewe-13/DJINN/blob/master/CHANGELOG.md).
