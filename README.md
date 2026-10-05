@@ -10,6 +10,7 @@ Deep Jointly-Informed Neural Networks
 [![Docs](https://github.com/bwhewe-13/DJINN/actions/workflows/docs.yml/badge.svg?branch=master)](https://github.com/bwhewe-13/DJINN/actions/workflows/docs.yml)
 [![License: BSD](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/bwhewe-13/DJINN/blob/master/LICENSE)
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)
+[![PyPI](https://img.shields.io/pypi/v/djinnml)](https://pypi.org/project/djinnml/)
 
 
 Fork notice: This repository is a fork and continuation of LLNL's DJINN project (Deep Jointly-Informed Neural Networks) originally developed by Kelli D. Humbird (humbird1@llnl.gov). The original project is available at https://github.com/LLNL/djinn and is distributed under the license found in `LICENSE`. This fork is maintained by Ben Whewell (ben.whewell@pm.me) — https://github.com/bwhewe-13/DJINN
@@ -30,7 +31,13 @@ Requirements:
 - PyTorch
 - scikit-learn
 
-Install from source:
+Install from PyPI (the import name is `djinn`):
+
+```bash
+python -m pip install djinnml
+```
+
+Or install from source:
 
 ```bash
 git clone https://github.com/bwhewe-13/DJINN.git
@@ -93,13 +100,10 @@ make html
 ```
 
 ### Documentation
-To view the DJINN documentation:
+The documentation is hosted at https://bwhewe-13.github.io/DJINN/. To build it
+locally, run `make html` in `docs/` and open `docs/_build/html/index.html`.
 
-```
-cd docs
-make html
-```
-Open docs/_build/html/index.html in a browser
+Release notes are in [CHANGELOG.md](https://github.com/bwhewe-13/DJINN/blob/master/CHANGELOG.md).
 
 
 Source Repo Verification
@@ -281,6 +285,10 @@ If you use DJINN in your research, please cite the following paper:
 K. D. Humbird, J. L. Peterson and R. G. Mcclarren, "Deep Neural Network Initialization With Decision Trees," in IEEE Transactions on Neural Networks and Learning Systems, vol. 30, no. 5, pp. 1286-1295, May 2019.
 doi: 10.1109/TNNLS.2018.2869694,
 URL: http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8478232&isnumber=8695188
+
+Citation metadata for the paper and this PyTorch implementation is in
+[CITATION.cff](https://github.com/bwhewe-13/DJINN/blob/master/CITATION.cff); GitHub's
+"Cite this repository" button exports it as BibTeX or APA.
 
 
 
