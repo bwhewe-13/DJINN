@@ -14,6 +14,7 @@ authors:
 version: 1.1.2
 date-released: "2026-10-05"
 license: BSD-3-Clause
+doi: "10.5281/zenodo.23158769"
 repository-code: "https://github.com/bwhewe-13/DJINN"
 url: "https://github.com/bwhewe-13/DJINN"
 keywords:

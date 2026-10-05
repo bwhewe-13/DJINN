@@ -11,6 +11,7 @@ Deep Jointly-Informed Neural Networks
 [![License: BSD](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/bwhewe-13/DJINN/blob/master/LICENSE)
 ![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)
 [![PyPI](https://img.shields.io/pypi/v/djinnml)](https://pypi.org/project/djinnml/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23158769.svg)](https://doi.org/10.5281/zenodo.23158769)
 
 
 Fork notice: This repository is a fork and continuation of LLNL's DJINN project (Deep Jointly-Informed Neural Networks) originally developed by Kelli D. Humbird (humbird1@llnl.gov). The original project is available at https://github.com/LLNL/djinn and is distributed under the license found in `LICENSE`. This fork is maintained by Ben Whewell (ben.whewell@pm.me) — https://github.com/bwhewe-13/DJINN
