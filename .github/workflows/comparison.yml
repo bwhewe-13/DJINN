@@ -21,7 +21,9 @@ on:
       - "djinn/**"
       - "tests/test_tf_comparison.py"
       - "run_and_collect.py"
+      - "compare_results.py"
       - "results_tf.json"
+      - ".github/workflows/comparison.yml"
 
   pull_request:
     paths:
@@ -31,7 +33,7 @@ on:
 jobs:
   compare:
     name: Compare TF baseline vs PyTorch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     timeout-minutes: 90
 
@@ -41,10 +43,10 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -79,7 +81,7 @@ jobs:
             --hyper-trials 0
 
       - name: Upload results as artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: comparison-results-py${{ matrix.python-version }}
           path: |
@@ -101,7 +103,7 @@ jobs:
 
       - name: Upload comparison plot
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: comparison-plot-py${{ matrix.python-version }}
           path: djinn_comparison.png
