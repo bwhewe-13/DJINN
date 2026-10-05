@@ -488,6 +488,24 @@ class TestHyperparameters:
         lr = params["learning_rate"]
         assert 1e-6 <= lr <= 1.0, f"learning_rate={lr} is outside [1e-6, 1.0]"
 
+    def test_same_seed_gives_same_hyperparameters(self, small_data):
+        """Verify a fixed seed makes the hyperparameter search reproducible.
+
+        Parameters
+        ----------
+        small_data : tuple
+            Fixture providing train/test splits.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
+        X_train, _, y_train, _ = small_data
+        first = make_model().get_hyperparameters(X_train, y_train, seed=3)
+        second = make_model().get_hyperparameters(X_train, y_train, seed=3)
+        assert first == second
+
 
 class TestEdgeCases:
     """Edge-case behavior checks for PT-specific execution paths."""

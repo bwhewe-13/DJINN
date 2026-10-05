@@ -640,9 +640,14 @@ def get_hyperparams(
     ystar = {}
     ystar["preds"] = {}
 
+    # Seed dropout during the search, and the bias draw below, so the chosen
+    # hyperparameters are reproducible for a given seed.
+    if seed is not None:
+        torch.manual_seed(seed)
+
     print("Determining learning rate...")
     key = "tree_0"
-    weights, biases = build_tree_weights_and_biases(ttn, key)
+    weights, biases = build_tree_weights_and_biases(ttn, key, seed=seed)
     lr = get_learning_rate(
         regression,
         weights,
