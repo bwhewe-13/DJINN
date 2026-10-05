@@ -657,6 +657,9 @@ class DJINN_Regressor:
     def save(self, model_path, overwrite=False):
         """Persist the currently loaded model under an explicit output path.
 
+        Checkpoints are written from the in-memory models, so this works
+        whether or not :meth:`train` was called with ``save_model=True``.
+
         Parameters
         ----------
         model_path : str or pathlib.Path
@@ -674,16 +677,17 @@ class DJINN_Regressor:
 
         Raises
         ------
+        RuntimeError
+            If there are no trained or loaded models to save.
         FileExistsError
             If ``model_path`` already exists and ``overwrite`` is ``False``.
         """
+        if not self.__models:
+            raise RuntimeError("No models to save. Call train() or load_model() first.")
+
         target = Path(model_path)
         target_dir = target
         target_json = target.with_suffix(".json")
-
-        source_dir = Path(self.model_path) / self.model_name
-        if not source_dir.exists():
-            raise FileNotFoundError(f"Model directory not found: {source_dir}")
 
         if target_dir.exists():
             if not overwrite:
@@ -692,7 +696,19 @@ class DJINN_Regressor:
                     "replace it."
                 )
             shutil.rmtree(target_dir)
-        shutil.copytree(source_dir, target_dir)
+        target_dir.mkdir(parents=True)
+
+        for tree_idx, model in self.__models.items():
+            layers = [*model.hidden_layers, model.output_layer]
+            network_shape = [layers[0].in_features]
+            network_shape += [layer.out_features for layer in layers]
+            torch.save(
+                {
+                    "state_dict": model.state_dict(),
+                    "network_shape": network_shape,
+                },
+                target_dir / f"tree_{tree_idx}.pt",
+            )
 
         state = {
             "n_trees": self.__n_trees,

@@ -329,6 +329,91 @@ class TestSaveLoad:
         loaded = djinn.load(str(tmp_path / "test_model"))
         assert callable(getattr(loaded, "predict", None))
 
+    def test_save_without_training_directory(self, small_data, tmp_path):
+        """Verify save() works when train() did not write checkpoints.
+
+        Parameters
+        ----------
+        small_data : tuple
+            Fixture providing train/test splits.
+        tmp_path : pathlib.Path
+            Temporary directory fixture.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
+        X_train, X_test, y_train, _ = small_data
+        model = make_model()
+        train(model, X_train, y_train, ntrees=2, epochs=3, seed=0)
+        preds_before = model.predict(X_test)
+
+        model.save(str(tmp_path / "test_model"))
+        loaded = djinn.load(str(tmp_path / "test_model"))
+
+        np.testing.assert_allclose(preds_before, loaded.predict(X_test), rtol=1e-5)
+
+    def test_save_ignores_stale_model_directory(self, small_data, tmp_path):
+        """Verify save() writes this model, not an old one on disk.
+
+        A previous run leaves ``<model_path>/djinn_model`` behind. Training a
+        new model with ``save_model=False`` and the same ``model_path`` must
+        not cause save() to pick up the old checkpoints.
+
+        Parameters
+        ----------
+        small_data : tuple
+            Fixture providing train/test splits.
+        tmp_path : pathlib.Path
+            Temporary directory fixture.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
+        X_train, X_test, y_train, _ = small_data
+        old = make_model()
+        train(old, X_train, y_train, ntrees=1, epochs=3, seed=0, model_path=tmp_path)
+        assert (tmp_path / "djinn_model").exists()
+
+        new = make_model()
+        new.train(
+            X_train,
+            y_train,
+            ntrees=1,
+            epochs=3,
+            seed=1,
+            save_model=False,
+            save_files=False,
+            model_path=str(tmp_path),
+        )
+        preds_new = new.predict(X_test)
+        assert not np.allclose(old.predict(X_test), preds_new, atol=1e-6)
+
+        new.save(str(tmp_path / "saved"))
+        loaded = djinn.load(str(tmp_path / "saved"))
+
+        np.testing.assert_allclose(preds_new, loaded.predict(X_test), rtol=1e-5)
+
+    def test_save_before_training_raises(self, tmp_path):
+        """Verify save() raises a clear error when nothing has been trained.
+
+        Parameters
+        ----------
+        tmp_path : pathlib.Path
+            Temporary directory fixture.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
+        with pytest.raises(RuntimeError, match="No models to save"):
+            make_model().save(str(tmp_path / "test_model"))
+        assert not (tmp_path / "test_model").exists()
+
 
 class TestHyperparameters:
     """Validation checks for hyperparameter dictionary outputs."""
