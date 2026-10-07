@@ -88,3 +88,44 @@ class TestEstimatorBasics:
         X, y = iris
         model = DJINN_Classifier().train(X, y, epochs=2)
         assert model.score(X, y) == pytest.approx(np.mean(model.predict(X) == y))
+
+
+class TestFit:
+    """fit() takes its settings from the constructor."""
+
+    def test_fit_uses_constructor_settings(self, reg_data):
+        """Verify fit returns self and trains for the configured epochs."""
+        X, y = reg_data
+        model = DJINN_Regressor(learning_rate=0.01, epochs=3, random_state=0)
+        assert model.fit(X, y) is model
+        assert len(model.nninfo["train_cost"]) == 3
+
+    def test_fit_and_train_write_no_files(self, reg_data, tmp_path, monkeypatch):
+        """Verify neither fit nor train writes to the working directory."""
+        X, y = reg_data
+        monkeypatch.chdir(tmp_path)
+        DJINN_Regressor(learning_rate=0.01, epochs=2).fit(X, y)
+        DJINN_Regressor().train(X, y, epochs=2)
+        assert list(tmp_path.iterdir()) == []
+
+    def test_random_state_makes_fit_reproducible(self, reg_data):
+        """Verify two fits with the same random_state predict the same."""
+        X, y = reg_data
+        params = dict(n_trees=2, learning_rate=0.01, epochs=3, random_state=4)
+        a = DJINN_Regressor(**params).fit(X, y).predict(X)
+        b = DJINN_Regressor(**params).fit(X, y).predict(X)
+        np.testing.assert_allclose(a, b)
+
+    def test_old_fit_keywords_warn(self, reg_data):
+        """Verify training options passed to fit still work, with a warning."""
+        X, y = reg_data
+        model = DJINN_Regressor()
+        with pytest.warns(FutureWarning, match="deprecated"):
+            model.fit(X, y, learning_rate=0.01, epochs=2, save_model=False)
+        assert len(model.nninfo["train_cost"]) == 2
+
+    def test_unknown_fit_keyword_raises(self, reg_data):
+        """Verify a misspelled fit keyword is not silently ignored."""
+        X, y = reg_data
+        with pytest.raises(TypeError, match="learning_rte"):
+            DJINN_Regressor().fit(X, y, learning_rte=0.01)

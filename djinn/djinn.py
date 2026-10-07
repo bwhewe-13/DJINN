@@ -28,6 +28,7 @@ loading/saving of serialized DJINN models.
 
 import json
 import shutil
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -94,6 +95,20 @@ def _scaler_state(scaler):
     }
 
 
+_DEPRECATED_FIT_ARGS = {
+    "epochs",
+    "learning_rate",
+    "learn_rate",
+    "batch_size",
+    "weight_decay",
+    "save_files",
+    "save_model",
+    "model_name",
+    "model_path",
+    "seed",
+}
+
+
 class _DJINNBase(BaseEstimator):
     """Shared implementation for :class:`DJINN_Regressor` and
     :class:`DJINN_Classifier`.
@@ -108,6 +123,19 @@ class _DJINNBase(BaseEstimator):
         ``max_tree_depth - 1`` hidden layers.
     dropout_keep_prob : float, optional
         Probability of keeping a neuron in dropout layers.
+    epochs : int or None, optional
+        Training epochs used by :meth:`fit`. ``None`` picks them
+        automatically when ``learning_rate`` is also ``None``, otherwise
+        uses 1000.
+    learning_rate : float or None, optional
+        Learning rate used by :meth:`fit`. ``None`` runs
+        :meth:`get_hyperparameters` to choose it.
+    batch_size : int or None, optional
+        Minibatch size used by :meth:`fit`. ``None`` uses 5% of the samples.
+    weight_decay : float, optional
+        Multiplier for the L2 penalty on weights.
+    random_state : int or None, optional
+        Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
         Device used for training and inference.
     """
@@ -119,11 +147,22 @@ class _DJINNBase(BaseEstimator):
         n_trees=1,
         max_tree_depth=4,
         dropout_keep_prob=1.0,
+        *,
+        epochs=None,
+        learning_rate=None,
+        batch_size=None,
+        weight_decay=1.0e-8,
+        random_state=None,
         device="cpu",
     ):
         self.n_trees = n_trees
         self.max_tree_depth = max_tree_depth
         self.dropout_keep_prob = dropout_keep_prob
+        self.epochs = epochs
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
+        self.weight_decay = weight_decay
+        self.random_state = random_state
         self.device = device
 
     # Old attribute names. Properties, since fit() may only add names ending in _
@@ -234,7 +273,8 @@ class _DJINNBase(BaseEstimator):
         weight_decay : float, optional
             Multiplier for L2 penalty on weights.
         seed : int or None, optional
-            Random seed for reproducibility.
+            Random seed for reproducibility. Defaults to
+            :attr:`random_state`.
 
         Raises
         ------
@@ -247,6 +287,8 @@ class _DJINNBase(BaseEstimator):
             Dictionary with keys ``batch_size``, ``learning_rate``, and
             ``epochs``.
         """
+        if seed is None:
+            seed = self.random_state
         if X.ndim == 1:
             print("Please reshape single-input data to a one-column array")
             return
@@ -304,8 +346,8 @@ class _DJINNBase(BaseEstimator):
         learn_rate=None,
         batch_size=0,
         weight_decay=1.0e-8,
-        save_files=True,
-        save_model=True,
+        save_files=False,
+        save_model=False,
         model_name="djinn_model",
         model_path="./",
         ntrees=None,
@@ -346,7 +388,8 @@ class _DJINNBase(BaseEstimator):
         ntrees : int or None, optional
             Number of trees to train. Defaults to :attr:`n_trees`.
         seed : int or None, optional
-            Random seed for reproducibility.
+            Random seed for reproducibility. Defaults to
+            :attr:`random_state`.
         eval_every : int, optional
             Compute the validation loss every ``eval_every`` epochs.
 
@@ -362,6 +405,8 @@ class _DJINNBase(BaseEstimator):
         """
         if learn_rate is not None:
             learning_rate = learn_rate
+        if seed is None:
+            seed = self.random_state
 
         self.n_trees_ = int(ntrees) if ntrees is not None else self.n_trees
         self.model_name_ = model_name
@@ -429,79 +474,70 @@ class _DJINNBase(BaseEstimator):
             self._save_json()
         return self
 
-    def fit(
-        self,
-        X,
-        Y,
-        epochs=None,
-        learning_rate=None,
-        learn_rate=None,
-        batch_size=None,
-        weight_decay=1.0e-8,
-        save_files=True,
-        save_model=True,
-        model_name="djinn_model",
-        model_path="./",
-        seed=None,
-    ):
-        """Train DJINN, auto-selecting hyperparameters when not supplied.
+    def fit(self, X, y, **kwargs):
+        """Train DJINN using the settings given to the constructor.
 
-        If ``learning_rate`` is None, calls :meth:`get_hyperparameters` first
-        and uses the returned values before delegating to :meth:`train`.
+        When :attr:`learning_rate` is ``None``, :meth:`get_hyperparameters`
+        picks the learning rate, and also the epochs and batch size unless
+        they were set.
 
         Parameters
         ----------
-        X : ndarray
-            Input feature matrix for training.
-        Y : ndarray
-            Target array for training.
-        epochs : int or None, optional
-            Number of training epochs.
-        learning_rate : float or None, optional
-            Learning rate for weight and bias optimization. If ``None``,
-            hyperparameters are tuned automatically.
-        learn_rate : float or None, optional
-            Backward-compatible alias for ``learning_rate``.
-        batch_size : int or None, optional
-            Number of samples per batch.
-        weight_decay : float, optional
-            Multiplier for L2 penalty on weights.
-        save_files : bool, optional
-            If ``True``, saves train/validation cost and weights.
-        save_model : bool, optional
-            If ``True``, saves the trained model.
-        model_name : str, optional
-            File name for the model.
-        model_path : str, optional
-            Directory where model/files are saved.
-        seed : int or None, optional
-            Random seed for reproducibility.
+        X : array-like of shape (n_samples, n_features)
+            Training features.
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Training targets.
+        **kwargs
+            Deprecated. ``epochs``, ``learning_rate``, ``learn_rate``,
+            ``batch_size``, ``weight_decay``, ``save_files``, ``save_model``,
+            ``model_name``, ``model_path``, and ``seed`` are still accepted
+            but will be removed in 2.0. Set them in the constructor, or use
+            :meth:`train` and :meth:`save`.
 
         Returns
         -------
         self
             The trained model.
         """
-        if learn_rate is not None and learning_rate is None:
-            learning_rate = learn_rate
+        unknown = set(kwargs) - _DEPRECATED_FIT_ARGS
+        if unknown:
+            raise TypeError(f"fit() got unexpected keyword arguments {sorted(unknown)}")
+        if kwargs:
+            warnings.warn(
+                "Passing training options to fit() is deprecated and will be "
+                "removed in 2.0. Set them in the constructor, or use train() "
+                "and save().",
+                FutureWarning,
+                stacklevel=2,
+            )
+
+        epochs = kwargs.get("epochs", self.epochs)
+        learning_rate = kwargs.get(
+            "learning_rate", kwargs.get("learn_rate", self.learning_rate)
+        )
+        batch_size = kwargs.get("batch_size", self.batch_size)
+        weight_decay = kwargs.get("weight_decay", self.weight_decay)
+        seed = kwargs.get("seed", self.random_state)
 
         if learning_rate is None:
-            optimal = self.get_hyperparameters(X, Y, weight_decay, seed)
+            optimal = self.get_hyperparameters(X, y, weight_decay, seed)
             learning_rate = optimal["learning_rate"]
-            batch_size = optimal["batch_size"]
-            epochs = optimal["epochs"]
+            if epochs is None:
+                epochs = optimal["epochs"]
+            if batch_size is None:
+                batch_size = optimal["batch_size"]
 
         return self.train(
-            X=X,
-            Y=Y,
-            epochs=epochs,
+            X,
+            y,
+            epochs=1000 if epochs is None else epochs,
             learning_rate=learning_rate,
-            batch_size=batch_size,
+            batch_size=0 if batch_size is None else batch_size,
             weight_decay=weight_decay,
-            save_files=save_files,
-            save_model=save_model,
-            model_name=model_name,
-            model_path=model_path,
+            save_files=kwargs.get("save_files", False),
+            save_model=kwargs.get("save_model", False),
+            model_name=kwargs.get("model_name", "djinn_model"),
+            model_path=kwargs.get("model_path", "./"),
             seed=seed,
         )
 
@@ -886,6 +922,19 @@ class DJINN_Regressor(RegressorMixin, _DJINNBase):
         ``max_tree_depth - 1`` hidden layers.
     dropout_keep_prob : float, optional
         Probability of keeping a neuron in dropout layers.
+    epochs : int or None, optional
+        Training epochs used by :meth:`fit`. ``None`` picks them
+        automatically when ``learning_rate`` is also ``None``, otherwise
+        uses 1000.
+    learning_rate : float or None, optional
+        Learning rate used by :meth:`fit`. ``None`` runs
+        :meth:`get_hyperparameters` to choose it.
+    batch_size : int or None, optional
+        Minibatch size used by :meth:`fit`. ``None`` uses 5% of the samples.
+    weight_decay : float, optional
+        Multiplier for the L2 penalty on weights.
+    random_state : int or None, optional
+        Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
         Device used for training and inference.
     """
@@ -909,6 +958,19 @@ class DJINN_Classifier(ClassifierMixin, _DJINNBase):
         ``max_tree_depth - 1`` hidden layers.
     dropout_keep_prob : float, optional
         Probability of keeping a neuron in dropout layers.
+    epochs : int or None, optional
+        Training epochs used by :meth:`fit`. ``None`` picks them
+        automatically when ``learning_rate`` is also ``None``, otherwise
+        uses 1000.
+    learning_rate : float or None, optional
+        Learning rate used by :meth:`fit`. ``None`` runs
+        :meth:`get_hyperparameters` to choose it.
+    batch_size : int or None, optional
+        Minibatch size used by :meth:`fit`. ``None`` uses 5% of the samples.
+    weight_decay : float, optional
+        Multiplier for the L2 penalty on weights.
+    random_state : int or None, optional
+        Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
         Device used for training and inference.
     """
