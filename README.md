@@ -30,7 +30,7 @@ Requirements:
 
 - Python 3.10+
 - PyTorch
-- scikit-learn
+- scikit-learn 1.6+
 
 Install from PyPI (the import name is `djinn`):
 
