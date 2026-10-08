@@ -10,7 +10,7 @@ from sklearn.base import clone, is_classifier, is_regressor
 from sklearn.datasets import load_iris
 from sklearn.exceptions import NotFittedError
 
-from djinn import DJINN_Classifier, DJINN_Regressor
+from djinn import DJINN_Classifier, DJINN_Regressor, djinn
 
 
 @pytest.fixture(scope="module")
@@ -178,3 +178,21 @@ class TestInputValidation:
         model = DJINN_Regressor().train(df, y, epochs=2)
         assert list(model.feature_names_in_) == ["a", "b", "c", "d"]
         assert model.predict(df).shape[0] == len(df)
+
+
+class TestPredictShape:
+    """predict() output follows the shape of the training target."""
+
+    def test_one_dimensional_target(self, reg_data, tmp_path):
+        """Verify a 1-D target gives 1-D predictions, also after reloading."""
+        X, y = reg_data
+        model = DJINN_Regressor().train(X, y.ravel(), epochs=2)
+        assert model.predict(X).shape == (len(X),)
+        model.save(tmp_path / "model")
+        assert djinn.load(tmp_path / "model").predict(X).shape == (len(X),)
+
+    def test_column_target_keeps_column(self, reg_data):
+        """Verify an (n, 1) target still gives (n, 1) predictions."""
+        X, y = reg_data
+        model = DJINN_Regressor().train(X, y, epochs=2)
+        assert model.predict(X).shape == (len(X), 1)

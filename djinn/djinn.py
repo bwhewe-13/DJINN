@@ -266,6 +266,7 @@ class _DJINNBase(BaseEstimator):
             "model_path": model_path,
             "xscale": _scaler_state(self.xscale_),
             "yscale": _scaler_state(self.yscale_),
+            "y_1d": getattr(self, "_y_1d", False),
         }
 
     def _save_json(self):
@@ -437,8 +438,8 @@ class _DJINNBase(BaseEstimator):
 
         X, Y = self._validate_training_data(X, Y)
 
-        single_output = Y.ndim == 1
-        if single_output:
+        self._y_1d = Y.ndim == 1
+        if self._y_1d:
             Y = Y.reshape(-1, 1)
 
         self._fit_scalers(X, Y)
@@ -593,6 +594,7 @@ class _DJINNBase(BaseEstimator):
         obj.xscale_ = _scaler_from_state(state["xscale"])
         obj.xscale_.clip = False
         obj.n_features_in_ = obj.xscale_.n_features_in_
+        obj._y_1d = state.get("y_1d", False)
         obj.yscale_ = (
             _scaler_from_state(state["yscale"]) if state["yscale"] is not None else None
         )
@@ -751,9 +753,13 @@ class _DJINNBase(BaseEstimator):
         -------
         ndarray
             Mean target value prediction for each test point, shape
+            ``(n_test,)`` if the model was trained on a 1-D target, otherwise
             ``(n_test, n_outputs)``.
         """
-        return self.bayesian_predict(x_test, None, seed)
+        preds = self.bayesian_predict(x_test, None, seed)
+        if getattr(self, "_y_1d", False):
+            preds = preds.ravel()
+        return preds
 
     def bma_predict(self, x_test, n_iters=100, seed=None):
         """Return Bayesian model averaging samples and summary statistics.
