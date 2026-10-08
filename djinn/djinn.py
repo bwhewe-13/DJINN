@@ -35,6 +35,7 @@ import numpy as np
 import torch
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.utils.validation import check_is_fitted, validate_data
 
 # Functions from the provided modules
 from djinn.neural_network import (
@@ -217,6 +218,30 @@ class _DJINNBase(BaseEstimator):
         # Allow predictions outside the training range
         self.xscale_.clip = False
 
+    def _validate_training_data(self, X, Y):
+        """Check training data and record the input shape.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training features.
+        Y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Training targets.
+
+        Returns
+        -------
+        tuple[ndarray, ndarray]
+            ``X`` and ``Y`` as arrays.
+        """
+        return validate_data(
+            self,
+            X,
+            Y,
+            multi_output=True,
+            y_numeric=self._regression,
+            dtype=np.float64,
+        )
+
     def _state(self, model_name, model_path):
         """Return the JSON-serializable state used to rebuild this model.
 
@@ -289,9 +314,7 @@ class _DJINNBase(BaseEstimator):
         """
         if seed is None:
             seed = self.random_state
-        if X.ndim == 1:
-            print("Please reshape single-input data to a one-column array")
-            return
+        X, Y = self._validate_training_data(X, Y)
 
         single_output = Y.ndim == 1
         if single_output:
@@ -412,9 +435,7 @@ class _DJINNBase(BaseEstimator):
         self.model_name_ = model_name
         self.model_path_ = model_path
 
-        if X.ndim == 1:
-            print("Please reshape single-input data to a one-column array")
-            return
+        X, Y = self._validate_training_data(X, Y)
 
         single_output = Y.ndim == 1
         if single_output:
@@ -571,6 +592,7 @@ class _DJINNBase(BaseEstimator):
         obj.model_path_ = state["model_path"]
         obj.xscale_ = _scaler_from_state(state["xscale"])
         obj.xscale_.clip = False
+        obj.n_features_in_ = obj.xscale_.n_features_in_
         obj.yscale_ = (
             _scaler_from_state(state["yscale"]) if state["yscale"] is not None else None
         )
@@ -646,11 +668,11 @@ class _DJINNBase(BaseEstimator):
         if seed is not None:
             torch.manual_seed(seed)
 
+        check_is_fitted(self, "xscale_")
+        x_test = validate_data(self, x_test, reset=False, dtype=np.float64)
+
         if getattr(self, "models_", None) is None:
             self.load_model(self.model_name, self.model_path)
-
-        if x_test.ndim == 1:
-            x_test = x_test.reshape(1, -1)
 
         samples = {"inputs": x_test, "predictions": {}}
 

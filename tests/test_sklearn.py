@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 from sklearn.base import clone, is_classifier, is_regressor
 from sklearn.datasets import load_iris
+from sklearn.exceptions import NotFittedError
 
 from djinn import DJINN_Classifier, DJINN_Regressor
 
@@ -129,3 +130,51 @@ class TestFit:
         X, y = reg_data
         with pytest.raises(TypeError, match="learning_rte"):
             DJINN_Regressor().fit(X, y, learning_rte=0.01)
+
+
+class TestInputValidation:
+    """Inputs are checked the way scikit-learn estimators check them."""
+
+    @pytest.mark.parametrize("cls", [DJINN_Regressor, DJINN_Classifier])
+    def test_predict_before_fit_raises(self, cls, reg_data):
+        """Verify predicting with an unfitted model raises NotFittedError."""
+        X, _ = reg_data
+        with pytest.raises(NotFittedError):
+            cls().predict(X)
+
+    def test_one_dimensional_X_raises(self, reg_data):
+        """Verify a 1-D feature array is rejected instead of ignored."""
+        X, y = reg_data
+        with pytest.raises(ValueError, match="2D array"):
+            DJINN_Regressor().train(X[:, 0], y, epochs=2)
+
+    def test_wrong_feature_count_raises(self, reg_data):
+        """Verify predict rejects data with a different number of features."""
+        X, y = reg_data
+        model = DJINN_Regressor().train(X, y, epochs=2)
+        assert model.n_features_in_ == X.shape[1]
+        with pytest.raises(ValueError, match="features"):
+            model.predict(X[:, :2])
+
+    def test_nan_input_raises(self, reg_data):
+        """Verify NaN features are rejected before training."""
+        X, y = reg_data
+        X = X.copy()
+        X[0, 0] = np.nan
+        with pytest.raises(ValueError, match="NaN"):
+            DJINN_Regressor().train(X, y, epochs=2)
+
+    def test_lists_are_accepted(self, reg_data):
+        """Verify plain Python lists work for training and prediction."""
+        X, y = reg_data
+        model = DJINN_Regressor().train(X.tolist(), y.tolist(), epochs=2)
+        assert model.predict(X[:5].tolist()).shape[0] == 5
+
+    def test_dataframe_feature_names(self, reg_data):
+        """Verify DataFrame column names are recorded."""
+        pd = pytest.importorskip("pandas")
+        X, y = reg_data
+        df = pd.DataFrame(X, columns=["a", "b", "c", "d"])
+        model = DJINN_Regressor().train(df, y, epochs=2)
+        assert list(model.feature_names_in_) == ["a", "b", "c", "d"]
+        assert model.predict(df).shape[0] == len(df)

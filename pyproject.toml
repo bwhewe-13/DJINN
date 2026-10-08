@@ -37,11 +37,12 @@ Upstream = "https://github.com/LLNL/djinn"
 Homepage = "https://github.com/bwhewe-13/DJINN"
 
 [project.optional-dependencies]
-testing = ["pytest>=7", "pytest-cov"]
+testing = ["pytest>=7", "pytest-cov", "pandas"]
 dev = [
     "pytest>=7",
     "pytest-cov",
     "pytest-xdist",
+    "pandas",
     "black==26.1.0",
     "isort",
     "flake8",
