@@ -139,6 +139,8 @@ class _DJINNBase(BaseEstimator):
         Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
         Device used for training and inference.
+    verbose : int, optional
+        Print progress messages when greater than 0.
     """
 
     _regression = True
@@ -155,6 +157,7 @@ class _DJINNBase(BaseEstimator):
         weight_decay=1.0e-8,
         random_state=None,
         device="cpu",
+        verbose=0,
     ):
         self.n_trees = n_trees
         self.max_tree_depth = max_tree_depth
@@ -165,6 +168,7 @@ class _DJINNBase(BaseEstimator):
         self.weight_decay = weight_decay
         self.random_state = random_state
         self.device = device
+        self.verbose = verbose
 
     # Old attribute names. Properties, since fit() may only add names ending in _
     @property
@@ -338,7 +342,8 @@ class _DJINNBase(BaseEstimator):
             self._regression, X, Y, self.n_trees, rfr, seed
         )
 
-        print("Finding optimal hyper-parameters...")
+        if self.verbose:
+            print("Finding optimal hyper-parameters...")
         nn_batch_size, learning_rate, nn_epochs = get_hyperparams(
             self._regression,
             tree_to_network,
@@ -350,6 +355,7 @@ class _DJINNBase(BaseEstimator):
             weight_decay,
             seed=seed,
             device=self._torch_device(),
+            verbose=bool(self.verbose),
         )
 
         return {
@@ -627,6 +633,7 @@ class _DJINNBase(BaseEstimator):
                 self._torch_device(),
                 self.dropout_keep_prob,
                 tree_idx,
+                verbose=bool(self.verbose),
             )
             models[tree_idx] = model
 
@@ -931,6 +938,7 @@ class _DJINNBase(BaseEstimator):
             weight_decay=0.0,
             seed=seed,
             device=self._torch_device(),
+            verbose=bool(self.verbose),
         )
 
 
@@ -965,6 +973,8 @@ class DJINN_Regressor(RegressorMixin, _DJINNBase):
         Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
         Device used for training and inference.
+    verbose : int, optional
+        Print progress messages when greater than 0.
     """
 
 
@@ -1001,6 +1011,8 @@ class DJINN_Classifier(ClassifierMixin, _DJINNBase):
         Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
         Device used for training and inference.
+    verbose : int, optional
+        Print progress messages when greater than 0.
     """
 
     _regression = False

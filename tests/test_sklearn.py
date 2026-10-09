@@ -196,3 +196,21 @@ class TestPredictShape:
         X, y = reg_data
         model = DJINN_Regressor().train(X, y, epochs=2)
         assert model.predict(X).shape == (len(X), 1)
+
+
+class TestVerbose:
+    """Progress messages are opt-in."""
+
+    def test_quiet_by_default(self, reg_data, capsys):
+        """Verify fit prints nothing unless verbose is set."""
+        X, y = reg_data
+        DJINN_Regressor(learning_rate=0.01, epochs=2).fit(X, y)
+        assert capsys.readouterr().out == ""
+
+    def test_verbose_prints_progress(self, reg_data, tmp_path, capsys):
+        """Verify verbose models report when trees are restored."""
+        X, y = reg_data
+        DJINN_Regressor().train(X, y, epochs=2).save(tmp_path / "model")
+        model = djinn.load(tmp_path / "model")
+        model.set_params(verbose=1).load_model(model.model_name, model.model_path)
+        assert "Tree 0 restored" in capsys.readouterr().out
