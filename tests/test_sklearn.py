@@ -4,6 +4,8 @@ tests/test_sklearn.py — scikit-learn estimator compatibility.
     (pt-djinn) $ pytest tests/test_sklearn.py -v
 """
 
+import json
+
 import numpy as np
 import pytest
 from sklearn.base import clone, is_classifier, is_regressor
@@ -244,3 +246,32 @@ class TestClassifierLabels:
         np.testing.assert_array_equal(
             model.classes_[proba.argmax(axis=1)], model.predict(X)
         )
+
+
+class TestSaveLoad:
+    """Saved models come back as the same kind of estimator."""
+
+    def test_classifier_round_trip(self, iris, tmp_path):
+        """Verify a saved classifier reloads with its labels and outputs."""
+        X, y = iris
+        names = np.array(["a", "b", "c"])[y]
+        model = DJINN_Classifier(n_trees=2).train(X, names, epochs=3)
+        model.save(tmp_path / "clf")
+        loaded = djinn.load(tmp_path / "clf")
+        assert isinstance(loaded, DJINN_Classifier)
+        np.testing.assert_array_equal(loaded.classes_, model.classes_)
+        np.testing.assert_array_equal(loaded.predict(X), model.predict(X))
+        np.testing.assert_allclose(loaded.predict_proba(X), model.predict_proba(X))
+
+    def test_old_classifier_file_loads(self, iris, tmp_path):
+        """Verify a classifier saved without type or labels still loads."""
+        X, y = iris
+        DJINN_Classifier().train(X, y, epochs=2).save(tmp_path / "clf")
+        json_path = tmp_path / "clf.json"
+        state = json.loads(json_path.read_text())
+        del state["estimator"], state["classes"]
+        json_path.write_text(json.dumps(state))
+        loaded = djinn.load(tmp_path / "clf")
+        assert isinstance(loaded, DJINN_Classifier)
+        np.testing.assert_array_equal(loaded.classes_, [0, 1, 2])
+        assert loaded.predict(X).shape == (len(X),)

@@ -262,7 +262,9 @@ class _DJINNBase(BaseEstimator):
         dict
             Hyperparameters, paths, and scaler values.
         """
+        classes = getattr(self, "classes_", None)
         return {
+            "estimator": type(self).__name__,
             "n_trees": self.n_trees_,
             "tree_max_depth": self.max_tree_depth,
             "dropout_keep_prob": self.dropout_keep_prob,
@@ -272,6 +274,7 @@ class _DJINNBase(BaseEstimator):
             "xscale": _scaler_state(self.xscale_),
             "yscale": _scaler_state(self.yscale_),
             "y_1d": getattr(self, "_y_1d", False),
+            "classes": None if classes is None else classes.tolist(),
         }
 
     def _save_json(self):
@@ -602,6 +605,8 @@ class _DJINNBase(BaseEstimator):
         obj.xscale_.clip = False
         obj.n_features_in_ = obj.xscale_.n_features_in_
         obj._y_1d = state.get("y_1d", False)
+        if state.get("classes") is not None:
+            obj.classes_ = np.array(state["classes"])
         obj.yscale_ = (
             _scaler_from_state(state["yscale"]) if state["yscale"] is not None else None
         )
@@ -1169,13 +1174,24 @@ def load(model_path):
 
     Returns
     -------
-    DJINN_Regressor
+    DJINN_Regressor or DJINN_Classifier
         Reconstructed model with checkpoints loaded.
     """
 
     path = Path(model_path)
     # find the .json sidecar — could be path itself or path.json
     json_path = path if path.suffix == ".json" else path.with_suffix(".json")
-    obj = DJINN_Regressor.from_json(json_path)
+    with open(json_path, "r") as f:
+        state = json.load(f)
+
+    # Files from 1.1.x only record the regression flag
+    name = state.get("estimator")
+    if name is None:
+        name = "DJINN_Regressor" if state["regression"] else "DJINN_Classifier"
+    cls = DJINN_Classifier if name == "DJINN_Classifier" else DJINN_Regressor
+
+    obj = cls.from_json(json_path)
     obj.load_model(obj.model_name, obj.model_path)
+    if cls is DJINN_Classifier and not hasattr(obj, "classes_"):
+        obj.classes_ = np.arange(obj.models_[0].output_layer.out_features)
     return obj
