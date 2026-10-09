@@ -214,3 +214,33 @@ class TestVerbose:
         model = djinn.load(tmp_path / "model")
         model.set_params(verbose=1).load_model(model.model_name, model.model_path)
         assert "Tree 0 restored" in capsys.readouterr().out
+
+
+class TestClassifierLabels:
+    """The classifier works with any label values and exposes probabilities."""
+
+    def test_string_labels(self, iris):
+        """Verify string labels are predicted back as the same strings."""
+        X, y = iris
+        names = np.array(["setosa", "versicolor", "virginica"])[y]
+        model = DJINN_Classifier().train(X, names, epochs=2)
+        assert list(model.classes_) == ["setosa", "versicolor", "virginica"]
+        assert set(model.predict(X)) <= set(model.classes_)
+
+    def test_labels_not_starting_at_zero(self, iris):
+        """Verify labels 1-3 train and predict without index errors."""
+        X, y = iris
+        model = DJINN_Classifier().train(X, y + 1, epochs=2)
+        np.testing.assert_array_equal(model.classes_, [1, 2, 3])
+        assert set(model.predict(X)) <= {1, 2, 3}
+
+    def test_predict_proba_matches_predict(self, iris):
+        """Verify probabilities sum to 1 and their argmax is the prediction."""
+        X, y = iris
+        model = DJINN_Classifier(n_trees=3).train(X, y, epochs=5)
+        proba = model.predict_proba(X)
+        assert proba.shape == (len(X), 3)
+        np.testing.assert_allclose(proba.sum(axis=1), 1.0)
+        np.testing.assert_array_equal(
+            model.classes_[proba.argmax(axis=1)], model.predict(X)
+        )

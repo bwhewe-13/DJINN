@@ -35,6 +35,7 @@ import numpy as np
 import torch
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_is_fitted, validate_data
 
 # Functions from the provided modules
@@ -1017,13 +1018,75 @@ class DJINN_Classifier(ClassifierMixin, _DJINNBase):
 
     _regression = False
 
+    def _validate_training_data(self, X, Y):
+        """Check training data and encode class labels as 0..n_classes-1.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training features.
+        Y : array-like of shape (n_samples,)
+            Class labels.
+
+        Returns
+        -------
+        tuple[ndarray, ndarray]
+            ``X`` as an array and the encoded labels.
+        """
+        X, Y = validate_data(self, X, Y, dtype=np.float64)
+        check_classification_targets(Y)
+        self.classes_, Y = np.unique(Y, return_inverse=True)
+        return X, Y
+
+    def _labels(self, indices):
+        """Map class indices back to the original labels.
+
+        Parameters
+        ----------
+        indices : ndarray
+            Class indices.
+
+        Returns
+        -------
+        ndarray
+            Labels from :attr:`classes_`, or the indices for models saved
+            without them.
+        """
+        classes = getattr(self, "classes_", None)
+        return indices if classes is None else classes[indices]
+
+    def _tree_probabilities(self, x_test, n_iters, seed):
+        """Return softmax outputs from every tree network.
+
+        Parameters
+        ----------
+        x_test : array-like of shape (n_test, n_features)
+            Input features.
+        n_iters : int or None
+            Number of forward passes per network, or ``None`` for one
+            deterministic pass.
+        seed : int or None
+            Random seed for reproducibility.
+
+        Returns
+        -------
+        tuple[ndarray, dict]
+            Probabilities with shape ``(n_iters * n_trees, n_test, n_classes)``
+            and the raw sample dictionary.
+        """
+
+        def to_probabilities(logits):
+            return torch.softmax(logits, dim=1).cpu().numpy()
+
+        return self._tree_outputs(x_test, n_iters, seed, to_probabilities)
+
     def bayesian_predict(self, x_test, n_iters, seed=None):
         """Bayesian distribution of class predictions for a set of test inputs.
 
         Evaluates each tree network ``n_iters`` times (with dropout active)
         to build a predictive distribution over class probabilities, then
         returns the ``argmax`` of the 25th, 50th, and 75th percentiles as
-        integer class labels alongside the raw sample dictionary.
+        class labels alongside the raw sample dictionary.
 
         Parameters
         ----------
@@ -1039,25 +1102,40 @@ class DJINN_Classifier(ClassifierMixin, _DJINNBase):
         -------
         ndarray or tuple
             If ``n_iters`` is ``None``, returns a 1-D array of predicted class
-            indices with shape ``(n_test,)``. Otherwise returns
+            labels with shape ``(n_test,)``. Otherwise returns
             ``(lower, middle, upper, samples)``, where percentile outputs are
-            1-D arrays of class indices and ``samples`` contains per-tree
+            1-D arrays of class labels and ``samples`` contains per-tree
             probability draws.
         """
+        preds, samples = self._tree_probabilities(x_test, n_iters, seed)
 
-        def to_probabilities(logits):
-            # Softmax converts logits to class probabilities
-            return torch.softmax(logits, dim=1).cpu().numpy()
-
-        preds, samples = self._tree_outputs(x_test, n_iters, seed, to_probabilities)
-
-        # Reduce probability distributions to class-index predictions
-        middle = np.argmax(np.percentile(preds, 50, axis=0), axis=1)
+        middle = self._labels(np.argmax(np.percentile(preds, 50, axis=0), axis=1))
         if n_iters is None:
             return middle
-        lower = np.argmax(np.percentile(preds, 25, axis=0), axis=1)
-        upper = np.argmax(np.percentile(preds, 75, axis=0), axis=1)
+        lower = self._labels(np.argmax(np.percentile(preds, 25, axis=0), axis=1))
+        upper = self._labels(np.argmax(np.percentile(preds, 75, axis=0), axis=1))
         return lower, middle, upper, samples
+
+    def predict_proba(self, x_test):
+        """Predict class probabilities for a set of test inputs.
+
+        Takes the per-class median of the tree networks' softmax outputs
+        (the same reduction :meth:`predict` uses) and normalizes each row.
+
+        Parameters
+        ----------
+        x_test : array-like of shape (n_test, n_features)
+            Input features.
+
+        Returns
+        -------
+        ndarray
+            Probabilities with shape ``(n_test, n_classes)``, columns ordered
+            as :attr:`classes_`.
+        """
+        preds, _ = self._tree_probabilities(x_test, None, None)
+        proba = np.median(preds, axis=0).astype(np.float64)
+        return proba / proba.sum(axis=1, keepdims=True)
 
     def predict(self, x_test, seed=None):
         """Predict class labels for a set of test inputs.
@@ -1076,7 +1154,7 @@ class DJINN_Classifier(ClassifierMixin, _DJINNBase):
         Returns
         -------
         ndarray
-            Predicted class index for each test point, shape ``(n_test,)``.
+            Predicted class label for each test point, shape ``(n_test,)``.
         """
         return self.bayesian_predict(x_test, None, seed)
 
