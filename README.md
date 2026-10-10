@@ -30,7 +30,7 @@ Requirements:
 
 - Python 3.10+
 - PyTorch
-- scikit-learn
+- scikit-learn 1.6+
 
 Install from PyPI (the import name is `djinn`):
 
@@ -55,6 +55,25 @@ python djinn_regression.py
 python djinn_classification.py
 python djinn_multiout.py
 ```
+
+Using DJINN with scikit-learn
+-----------------------------
+`DJINN_Regressor` and `DJINN_Classifier` are scikit-learn estimators, so they
+work with `Pipeline`, `cross_val_score`, `GridSearchCV` and `clone`:
+
+```python
+from sklearn.model_selection import GridSearchCV
+from djinn import DJINN_Regressor
+
+model = DJINN_Regressor(n_trees=3, learning_rate=0.005, epochs=300, random_state=0)
+search = GridSearchCV(model, {"max_tree_depth": [3, 4, 5]}, cv=5)
+search.fit(X, y)
+search.best_estimator_.save("best_model")
+```
+
+If `learning_rate` is left as `None`, `fit()` searches for a learning rate,
+number of epochs and batch size first. That search trains about 2,000 epochs,
+so set `learning_rate` when fitting many models, e.g. in a grid search.
 
 Notes:
 

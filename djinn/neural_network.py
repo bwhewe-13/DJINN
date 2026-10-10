@@ -22,6 +22,7 @@
 """PyTorch training, evaluation, and persistence utilities for DJINN models."""
 
 import json
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +30,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 
@@ -598,7 +600,11 @@ def find_optimal_epochs(
 
         if epoch >= max_training_epochs:
             converged = True
-            print("Warning: Reached max # training epochs:", max_training_epochs)
+            warnings.warn(
+                f"Reached the maximum of {max_training_epochs} training epochs",
+                ConvergenceWarning,
+                stacklevel=2,
+            )
             maxep = max_training_epochs
 
     return maxep
@@ -615,6 +621,7 @@ def get_hyperparams(
     weight_decay,
     seed,
     device=None,
+    verbose=True,
 ):
     """Automatically select DJINN hyperparameters for a mapped tree network.
 
@@ -640,6 +647,8 @@ def get_hyperparams(
         Random seed used in preprocessing/splitting.
     device : torch.device or None, optional
         Compute device.
+    verbose : bool, optional
+        Print progress and the selected values.
 
     Returns
     -------
@@ -659,7 +668,8 @@ def get_hyperparams(
     if seed is not None:
         torch.manual_seed(seed)
 
-    print("Determining learning rate...")
+    if verbose:
+        print("Determining learning rate...")
     key = "tree_0"
     weights, biases = build_tree_weights_and_biases(ttn, key, seed=seed)
     lr = get_learning_rate(
@@ -674,7 +684,8 @@ def get_hyperparams(
         device,
     )
 
-    print("Determining number of epochs needed...")
+    if verbose:
+        print("Determining number of epochs needed...")
     max_training_epochs = 3000
     opt_epochs = find_optimal_epochs(
         regression,
@@ -690,9 +701,10 @@ def get_hyperparams(
         device,
     )
 
-    print("Optimal learning rate: ", lr)
-    print("Optimal # epochs: ", opt_epochs)
-    print("Optimal batch size: ", batch_size)
+    if verbose:
+        print("Optimal learning rate: ", lr)
+        print("Optimal # epochs: ", opt_epochs)
+        print("Optimal batch size: ", batch_size)
 
     return (batch_size, lr, opt_epochs)
 
@@ -1124,7 +1136,7 @@ def load_tree_data(xscale, yscale, x, y, regression, batch_size, device):
     return loader
 
 
-def load_tree_model(checkpoint_path, device, dropout_keep_prob, tree_idx):
+def load_tree_model(checkpoint_path, device, dropout_keep_prob, tree_idx, verbose=True):
     """Restore a saved tree checkpoint as a PyTorch model.
 
     Parameters
@@ -1137,6 +1149,8 @@ def load_tree_model(checkpoint_path, device, dropout_keep_prob, tree_idx):
         Keep probability used when rebuilding dropout layers.
     tree_idx : int
         Zero-based tree index for logging.
+    verbose : bool, optional
+        Print a message once the tree is restored.
 
     Returns
     -------
@@ -1202,7 +1216,8 @@ def load_tree_model(checkpoint_path, device, dropout_keep_prob, tree_idx):
     ).to(device)
 
     model.load_state_dict(checkpoint["state_dict"])
-    print(f"Tree {tree_idx} restored")
+    if verbose:
+        print(f"Tree {tree_idx} restored")
     return model, network_shape
 
 
@@ -1222,6 +1237,7 @@ def torch_continue_training(
     weight_decay=0.0,
     seed=None,
     device=None,
+    verbose=True,
 ):
     """Continue training previously saved DJINN PyTorch models.
 
@@ -1257,6 +1273,8 @@ def torch_continue_training(
         Random seed.
     device : torch.device, str, or None
         Device to train on.
+    verbose : bool, optional
+        Print progress for each tree.
 
     Returns
     -------
@@ -1292,7 +1310,7 @@ def torch_continue_training(
 
         # Load the tree model
         model, network_shape = load_tree_model(
-            checkpoint_path, device, dropout_keep_prob, tree_idx
+            checkpoint_path, device, dropout_keep_prob, tree_idx, verbose
         )
         dense_weights, dense_biases = get_weights_and_biases(model)
         nninfo["initial_weights"][f"tree{tree_idx}"] = dense_weights
@@ -1308,7 +1326,8 @@ def torch_continue_training(
             epochs=n_epochs,
             early_stop_patience=None,
         )
-        print("Optimization Finished!")
+        if verbose:
+            print("Optimization Finished!")
 
         # Resave checkpoint
         torch.save(
@@ -1318,7 +1337,8 @@ def torch_continue_training(
             },
             checkpoint_path,
         )
-        print(f"Tree {tree_idx} resaved at {checkpoint_path}")
+        if verbose:
+            print(f"Tree {tree_idx} resaved at {checkpoint_path}")
 
         # Save final weights/biases to metadata
         dense_weights, dense_biases = get_weights_and_biases(model)

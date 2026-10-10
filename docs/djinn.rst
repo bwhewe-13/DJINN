@@ -15,3 +15,6 @@ djinn
     :members:
     :undoc-members:
     :show-inheritance:
+    :inherited-members:
+    :exclude-members: get_metadata_routing, score, set_predict_request,
+                      set_predict_proba_request, set_score_request

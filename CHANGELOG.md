@@ -6,6 +6,45 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `DJINN_Regressor` and `DJINN_Classifier` are scikit-learn estimators. They
+  work with `clone`, `Pipeline`, `cross_val_score` and `GridSearchCV`, and
+  pass scikit-learn's estimator checks except a few that use data too small
+  to grow a tree deeper than 1.
+- `epochs`, `learning_rate`, `batch_size`, `weight_decay`, `random_state`,
+  `device` and `verbose` constructor options.
+- `DJINN_Classifier.predict_proba()` and `classes_`. Class labels can be any
+  values, such as strings or 1..k.
+- Lists and pandas DataFrames are accepted as input, and DataFrame column
+  names are stored in `feature_names_in_`.
+
+### Changed
+
+- `fit(X, y)` takes its options from the constructor and returns the model.
+  Passing options to `fit()` still works but is deprecated and will be
+  removed in 2.0.
+- `fit()` and `train()` no longer write files by default. Use `save()`, or
+  pass `save_model=True` to `train()`.
+- `predict()` returns shape `(n,)` when the model was trained on a 1-D
+  target, and regression predictions are float64.
+- `predict()` rejects 1-D input; pass one sample as `X[[i]]`.
+- Progress messages are off unless `verbose=1`. Hitting the epoch limit in
+  the hyperparameter search raises a `ConvergenceWarning` instead of
+  printing.
+- `get_hyperparameters()` runs on the model's `device`; it used to pick the
+  GPU whenever one was available.
+- `DJINN_Classifier` no longer subclasses `DJINN_Regressor`, and the
+  constructors no longer accept `**kwargs`.
+- Requires scikit-learn 1.6 or newer.
+
+### Fixed
+
+- `load()` returns a `DJINN_Classifier` for saved classifiers. They used to
+  come back as regressors and fail to predict.
+- Fitting again on new data rescales to that data instead of reusing the
+  scaling from the first fit.
+
 ## [1.1.2] - 2026-10-05
 
 ### Fixed
