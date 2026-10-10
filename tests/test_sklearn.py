@@ -5,12 +5,16 @@ tests/test_sklearn.py — scikit-learn estimator compatibility.
 """
 
 import json
+import pickle
 
 import numpy as np
 import pytest
 from sklearn.base import clone, is_classifier, is_regressor
 from sklearn.datasets import load_iris
 from sklearn.exceptions import NotFittedError
+from sklearn.model_selection import GridSearchCV, cross_val_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 from djinn import DJINN_Classifier, DJINN_Regressor, djinn
 
@@ -275,3 +279,41 @@ class TestSaveLoad:
         assert isinstance(loaded, DJINN_Classifier)
         np.testing.assert_array_equal(loaded.classes_, [0, 1, 2])
         assert loaded.predict(X).shape == (len(X),)
+
+
+class TestIntegration:
+    """DJINN works inside scikit-learn's model selection tools."""
+
+    def test_pipeline(self, reg_data):
+        """Verify DJINN trains and predicts as the last step of a Pipeline."""
+        X, y = reg_data
+        pipe = make_pipeline(
+            StandardScaler(), DJINN_Regressor(learning_rate=0.01, epochs=5)
+        )
+        pipe.fit(X, y.ravel())
+        assert pipe.predict(X).shape == (len(X),)
+
+    def test_cross_val_score_in_parallel(self, reg_data):
+        """Verify cross-validation runs, including across worker processes."""
+        X, y = reg_data
+        model = DJINN_Regressor(learning_rate=0.01, epochs=5, random_state=0)
+        scores = cross_val_score(model, X, y.ravel(), cv=3, n_jobs=2)
+        assert scores.shape == (3,)
+        assert np.all(np.isfinite(scores))
+
+    def test_grid_search(self, iris):
+        """Verify GridSearchCV can tune the tree depth of a classifier."""
+        X, y = iris
+        model = DJINN_Classifier(learning_rate=0.01, epochs=5, random_state=0)
+        search = GridSearchCV(model, {"max_tree_depth": [3, 4]}, cv=3)
+        search.fit(X, y)
+        assert search.best_params_["max_tree_depth"] in (3, 4)
+        assert isinstance(search.best_estimator_, DJINN_Classifier)
+
+    @pytest.mark.parametrize("cls", [DJINN_Regressor, DJINN_Classifier])
+    def test_pickle_round_trip(self, cls, reg_data, iris):
+        """Verify a pickled model predicts the same after unpickling."""
+        X, y = iris if cls is DJINN_Classifier else reg_data
+        model = cls(n_trees=2).train(X, y, epochs=3)
+        restored = pickle.loads(pickle.dumps(model))
+        np.testing.assert_array_equal(restored.predict(X), model.predict(X))
