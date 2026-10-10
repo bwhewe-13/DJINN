@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-10
+
 ### Added
 
 - `DJINN_Regressor` and `DJINN_Classifier` are scikit-learn estimators. They
@@ -98,7 +100,8 @@ public API (`DJINN_Regressor`, `DJINN_Classifier`, `train`, `fit`, `predict`,
 - `find_optimal_epochs()` no longer crashes when `max_training_epochs <= 200`.
 - Trees too shallow to build a hidden layer raise a clear error.
 
-[Unreleased]: https://github.com/bwhewe-13/DJINN/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/bwhewe-13/DJINN/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/bwhewe-13/DJINN/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/bwhewe-13/DJINN/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/bwhewe-13/DJINN/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/bwhewe-13/DJINN/releases/tag/v1.1.0
