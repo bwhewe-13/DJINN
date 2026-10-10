@@ -245,6 +245,7 @@ class _DJINNBase(BaseEstimator):
             multi_output=True,
             y_numeric=self._regression,
             dtype=np.float64,
+            ensure_min_samples=2,
         )
 
     def _state(self, model_name, model_path):
@@ -737,7 +738,7 @@ class _DJINNBase(BaseEstimator):
         """
 
         def to_targets(raw):
-            return self.yscale_.inverse_transform(raw.cpu().numpy())
+            return self.yscale_.inverse_transform(raw.cpu().double().numpy())
 
         preds, samples = self._tree_outputs(x_test, n_iters, seed, to_targets)
 
@@ -983,6 +984,11 @@ class DJINN_Regressor(RegressorMixin, _DJINNBase):
         Print progress messages when greater than 0.
     """
 
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        tags.target_tags.multi_output = True
+        return tags
+
 
 class DJINN_Classifier(ClassifierMixin, _DJINNBase):
     """DJINN classification model.
@@ -1038,9 +1044,14 @@ class DJINN_Classifier(ClassifierMixin, _DJINNBase):
         tuple[ndarray, ndarray]
             ``X`` as an array and the encoded labels.
         """
-        X, Y = validate_data(self, X, Y, dtype=np.float64)
+        X, Y = validate_data(self, X, Y, dtype=np.float64, ensure_min_samples=2)
         check_classification_targets(Y)
         self.classes_, Y = np.unique(Y, return_inverse=True)
+        if len(self.classes_) < 2:
+            raise ValueError(
+                "DJINN_Classifier needs at least 2 classes, got 1 class: "
+                f"{self.classes_[0]!r}"
+            )
         return X, Y
 
     def _labels(self, indices):
