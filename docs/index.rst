@@ -29,15 +29,21 @@ Example
 -------
 .. code-block:: python
 
-    # Basic usage: fit a regression model & predict something new
-   from djinn import DJINN_Regressor
-   model = DJINN_Regressor()
-    model.fit(X,y)
+    from djinn import DJINN_Regressor, load
+
+    # Fit a regression model and predict something new
+    model = DJINN_Regressor(n_trees=3, random_state=0)
+    model.fit(X, y)
     y_new = model.predict(x_new)
 
-    # Add more training data with online learning
-    model.continue_training(X1,y1)
-    y_new1 = model.predict(x_new)
+    # Save it, then reload and keep training on more data
+    model.save("my_model")
+    model = load("my_model")
+    model.continue_training(X1, y1, training_epochs=100,
+                            learning_rate=0.005, batch_size=32)
+
+Both models are scikit-learn estimators, so they can be used in
+``Pipeline``, ``cross_val_score`` and ``GridSearchCV``.
 
 For more info, see `the paper <https://arxiv.org/abs/1707.00784>`_.
 
