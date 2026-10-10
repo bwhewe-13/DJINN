@@ -82,11 +82,11 @@ def main():
         seed=1,
     )
 
-    # *note there is a function model.fit(x_train,y_train, ... ) that wraps
-    # get_hyperparameters() and train(), so that you do not have to manually
-    # pass hyperparameters to train(). However, get_hyperparameters() can
-    # be expensive, so I recommend running it once per dataset and using those
-    # hyperparameter values in train() to save computational time
+    # *note model.fit(x_train, y_train) wraps get_hyperparameters() and
+    # train(), and follows scikit-learn conventions, so DJINN also works in
+    # Pipeline, cross_val_score and GridSearchCV. get_hyperparameters() can be
+    # expensive, so I recommend running it once per dataset and passing the
+    # learning rate to the constructor (or to train()) after that.
 
     # make predictions
     m = model.predict(x_test)  # returns the median prediction if more than one tree
@@ -121,18 +121,11 @@ def main():
     modelname = "class_bdjinn_test"
 
     # initialize a model
-    bmodel = djinn.DJINN_Classifier(ntrees, maxdepth, dropout_keep)
+    bmodel = djinn.DJINN_Classifier(ntrees, maxdepth, dropout_keep, random_state=1)
 
     # "fit()" does what get_hyperparameters + train does, in one step:
-    bmodel.fit(
-        x_train,
-        y_train,
-        save_files=True,
-        save_model=True,
-        model_name=modelname,
-        model_path=modeldump,
-        seed=1,
-    )
+    bmodel.fit(x_train, y_train)
+    bmodel.save(f"{modeldump}/{modelname}", overwrite=True)
 
     # evaluate: niters is the number of times you evaluate the network for
     # a single sample. higher niters = better resolved distribution of predictions
