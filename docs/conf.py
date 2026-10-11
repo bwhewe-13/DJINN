@@ -60,6 +60,8 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
+    "myst_parser",
+    "nbsphinx",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -68,7 +70,7 @@ templates_path = ["_templates"]
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 # source_suffix = ['.rst', '.md']
-source_suffix = ".rst"
+source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 
 # The encoding of source files.
 # source_encoding = 'utf-8-sig'
@@ -106,7 +108,23 @@ language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ["_build"]
+exclude_patterns = ["_build", "**.ipynb_checkpoints"]
+
+# Notebooks are committed with their outputs, so don't run them during the build
+nbsphinx_execute = "never"
+
+# Download and Colab links at the top of every notebook page
+_colab = "https://colab.research.google.com/github/bwhewe-13/DJINN/blob/master/docs"
+nbsphinx_prolog = r"""
+{% set docname = env.doc2path(env.docname, base=None) | string %}
+
+.. only:: html
+
+    .. note::
+
+        :download:`Download this notebook </{{ docname }}>` or
+        `open it in Colab <COLAB/{{ docname }}>`__.
+""".replace("COLAB", _colab)
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
@@ -392,4 +410,9 @@ epub_exclude_files = ["search.html"]
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "sklearn": ("https://scikit-learn.org/stable/", None),
+    "torch": ("https://docs.pytorch.org/docs/stable/", None),
+}
