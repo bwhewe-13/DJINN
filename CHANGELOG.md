@@ -12,6 +12,14 @@ uses [Semantic Versioning](https://semver.org/).
   to update only the checkpoints on disk, so predictions didn't change until
   the model was loaded again.
 
+### Documentation
+
+- The docs have new pages on how DJINN works, a user guide, using DJINN with
+  scikit-learn, the API and citing DJINN.
+- Six example notebooks, which can be downloaded or opened in Colab, replace
+  the scripts in `examples/`.
+- Docstrings list the fitted attributes of both models.
+
 ## [1.2.0] - 2026-10-10
 
 ### Added

@@ -47,14 +47,12 @@ python -m pip install --upgrade pip
 python -m pip install .
 ```
 
-Try it out using the examples in [examples](https://github.com/bwhewe-13/DJINN/tree/master/examples):
-
-```bash
-cd examples
-python djinn_regression.py
-python djinn_classification.py
-python djinn_multiout.py
-```
+The examples are Jupyter notebooks in
+[docs/examples](https://github.com/bwhewe-13/DJINN/tree/master/docs/examples),
+and they're also on the [examples page](https://www.ben-whewell.com/DJINN/examples/index.html)
+of the docs with download and Colab links. They cover regression,
+classification, multiple outputs, uncertainty, scikit-learn pipelines and how
+the trees become networks.
 
 Using DJINN with scikit-learn
 -----------------------------
@@ -79,11 +77,7 @@ Notes:
 
 - The scikit-learn version used when training a DJINN model should match the
     version used when loading/evaluating that saved model.
-- Some example workflows may require `matplotlib`:
-
-    ```bash
-    python -m pip install matplotlib
-    ```
+- The example notebooks also need `jupyter`, `matplotlib` and `pandas`.
 
 
 Development
@@ -98,8 +92,8 @@ python -m pip install -e .[dev]
 Run quality checks and tests:
 
 ```bash
-black --check djinn tests examples
-isort --check-only djinn tests examples
+black --check djinn tests docs/examples
+isort --check-only djinn tests
 flake8
 pytest
 ```
@@ -111,17 +105,17 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-Build docs locally:
+Build docs locally (nbsphinx also needs [pandoc](https://pandoc.org/installing.html)):
 
 ```bash
-python -m pip install sphinx
-cd docs
-make html
+python -m pip install -e .[docs]
+python -m sphinx -M html docs docs/_build
 ```
 
 ### Documentation
-The documentation is hosted at https://www.ben-whewell.com/DJINN/. To build it
-locally, run `make html` in `docs/` and open `docs/_build/html/index.html`.
+The documentation is hosted at https://www.ben-whewell.com/DJINN/. It covers
+how DJINN works, a user guide, the API and the example notebooks. To build it
+locally, see above and open `docs/_build/html/index.html`.
 
 Release notes are in [CHANGELOG.md](https://github.com/bwhewe-13/DJINN/blob/master/CHANGELOG.md).
 

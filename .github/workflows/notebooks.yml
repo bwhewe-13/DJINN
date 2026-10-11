@@ -1,0 +1,39 @@
+name: Notebooks
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "djinn/**"
+      - "docs/examples/**"
+      - "pyproject.toml"
+      - ".github/workflows/notebooks.yml"
+  pull_request:
+    paths:
+      - "djinn/**"
+      - "docs/examples/**"
+      - "pyproject.toml"
+      - ".github/workflows/notebooks.yml"
+
+jobs:
+  notebooks:
+    runs-on: ubuntu-26.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install package + docs dependencies
+        run: python -m pip install -e ".[docs]" pytest nbmake
+
+      # Runs each example notebook top to bottom without saving the outputs
+      - name: Run example notebooks
+        run: pytest --nbmake --nbmake-timeout=1800 docs/examples
