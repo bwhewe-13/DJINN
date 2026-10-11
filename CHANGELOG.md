@@ -6,6 +6,12 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `continue_training()` updates the networks that `predict()` uses. It used
+  to update only the checkpoints on disk, so predictions didn't change until
+  the model was loaded again.
+
 ## [1.2.0] - 2026-10-10
 
 ### Added

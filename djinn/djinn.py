@@ -898,10 +898,12 @@ class _DJINNBase(BaseEstimator):
         learn_rate=None,
         seed=None,
     ):
-        """Continue training an existing model (must call :meth:`load_model` first).
+        """Continue training a saved model.
 
-        Delegates to ``neural_network.torch_continue_training`` and re-saves
-        each tree checkpoint in place.
+        Load the model with :func:`djinn.load` first. Each network is trained
+        from its checkpoint for ``training_epochs`` more epochs, the
+        checkpoints are saved in place, and the updated networks are used by
+        :meth:`predict` afterwards.
 
         Parameters
         ----------
@@ -947,6 +949,8 @@ class _DJINNBase(BaseEstimator):
             device=self._torch_device(),
             verbose=bool(self.verbose),
         )
+        # Training updated the checkpoints on disk, not the models in memory
+        self.load_model(self.model_name, self.model_path)
 
 
 class DJINN_Regressor(RegressorMixin, _DJINNBase):
