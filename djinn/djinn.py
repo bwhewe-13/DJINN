@@ -986,6 +986,34 @@ class DJINN_Regressor(RegressorMixin, _DJINNBase):
         Device used for training and inference.
     verbose : int, optional
         Print progress messages when greater than 0.
+
+    Attributes
+    ----------
+    n_trees_ : int
+        Number of trained networks.
+    models_ : dict of torch.nn.Module
+        Trained networks, keyed by tree index.
+    xscale_ : sklearn.preprocessing.MinMaxScaler
+        Scaler fit to the training inputs.
+    yscale_ : sklearn.preprocessing.MinMaxScaler
+        Scaler fit to the training targets.
+    n_features_in_ : int
+        Number of features seen during fit.
+    feature_names_in_ : ndarray of str
+        Names of the features seen during fit. Only set when ``X`` has
+        feature names that are all strings.
+    nninfo_ : dict
+        Details from the last training run, including the loss per epoch in
+        ``train_cost`` and ``valid_cost``. Not set on loaded models.
+
+    Examples
+    --------
+    >>> from sklearn.datasets import load_diabetes
+    >>> from djinn import DJINN_Regressor
+    >>> X, y = load_diabetes(return_X_y=True)
+    >>> model = DJINN_Regressor(n_trees=3, learning_rate=0.005, epochs=200)
+    >>> model.fit(X, y).predict(X[:2]).shape
+    (2,)
     """
 
     def __sklearn_tags__(self):
@@ -1029,6 +1057,34 @@ class DJINN_Classifier(ClassifierMixin, _DJINNBase):
         Device used for training and inference.
     verbose : int, optional
         Print progress messages when greater than 0.
+
+    Attributes
+    ----------
+    classes_ : ndarray of shape (n_classes,)
+        Class labels seen during fit.
+    n_trees_ : int
+        Number of trained networks.
+    models_ : dict of torch.nn.Module
+        Trained networks, keyed by tree index.
+    xscale_ : sklearn.preprocessing.MinMaxScaler
+        Scaler fit to the training inputs.
+    n_features_in_ : int
+        Number of features seen during fit.
+    feature_names_in_ : ndarray of str
+        Names of the features seen during fit. Only set when ``X`` has
+        feature names that are all strings.
+    nninfo_ : dict
+        Details from the last training run, including the loss per epoch in
+        ``train_cost`` and ``valid_cost``. Not set on loaded models.
+
+    Examples
+    --------
+    >>> from sklearn.datasets import load_iris
+    >>> from djinn import DJINN_Classifier
+    >>> X, y = load_iris(return_X_y=True)
+    >>> model = DJINN_Classifier(n_trees=3, learning_rate=0.01, epochs=200)
+    >>> model.fit(X, y).predict_proba(X[:2]).shape
+    (2, 3)
     """
 
     _regression = False
