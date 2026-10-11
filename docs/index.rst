@@ -20,10 +20,21 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-DJINN: Deep Jointly-Informed Neural Networks's documentation!
-=============================================================
-Building djinn regression models with
-PyTorch and sklearn.
+DJINN: Deep Jointly-Informed Neural Networks
+============================================
+DJINN builds an ensemble of neural networks from a random forest. Each
+decision tree sets the architecture and the starting weights of one network,
+and then the networks are trained with PyTorch. Most of the effort of
+designing a network is done by the trees, so the only settings to tune are the
+number of trees and their depth. With dropout, the ensemble also gives
+uncertainty estimates.
+
+DJINN was introduced by Humbird, Peterson and McClarren in
+`Deep Neural Network Initialization With Decision Trees
+<https://doi.org/10.1109/TNNLS.2018.2869694>`_ (`arXiv
+<https://arxiv.org/abs/1707.00784>`_). For an application, see
+`Whewell and McClarren (2022) <https://doi.org/10.1016/j.anucene.2022.109276>`_,
+which used DJINN to reduce the data needed for neutron transport calculations.
 
 Example
 -------
@@ -43,31 +54,46 @@ Example
                             learning_rate=0.005, batch_size=32)
 
 Both models are scikit-learn estimators, so they can be used in
-``Pipeline``, ``cross_val_score`` and ``GridSearchCV``.
-
-For more info, see `the paper <https://arxiv.org/abs/1707.00784>`_.
-
-Package Contents
-================
+``Pipeline``, ``cross_val_score`` and ``GridSearchCV``. Install with
+``pip install djinnml``.
 
 .. toctree::
+   :maxdepth: 1
+   :caption: Getting started
+
    install
-   djinn
+   examples/01_quickstart
+
+.. toctree::
    :maxdepth: 2
+   :caption: User guide
 
+   theory
+   usage
+   sklearn
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Examples
 
-Indices and tables
-==================
+   examples/index
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
+   api
+
+.. toctree::
+   :maxdepth: 1
+   :caption: About
+
+   citing
+   changelog
+   djinn_license
+
+Indices
+-------
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
-
-License & Usage
-================
-
-.. toctree::
-   djinn_license
-   :maxdepth: 1

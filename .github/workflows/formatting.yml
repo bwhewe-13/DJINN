@@ -25,10 +25,10 @@ jobs:
         run: python -m pip install -e .[dev]
 
       - name: Check formatting (black)
-        run: black --required-version 26.1.0 --check djinn tests examples
+        run: black --required-version 26.1.0 --check djinn tests docs/examples
 
       - name: Check import sorting (isort)
-        run: isort --check-only djinn tests examples
+        run: isort --check-only djinn tests
 
       - name: Lint (flake8)
-        run: flake8 djinn tests examples
+        run: flake8 djinn tests

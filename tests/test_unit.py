@@ -414,6 +414,35 @@ class TestSaveLoad:
             make_model().save(str(tmp_path / "test_model"))
         assert not (tmp_path / "test_model").exists()
 
+    def test_continue_training_updates_predictions(self, small_data, tmp_path):
+        """Verify predict() uses the networks from continue_training().
+
+        Parameters
+        ----------
+        small_data : tuple
+            Fixture providing train/test splits.
+        tmp_path : pathlib.Path
+            Temporary directory fixture.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
+        X_train, X_test, y_train, _ = small_data
+        model = make_model()
+        train(model, X_train, y_train, ntrees=2, epochs=3, seed=0)
+        model.save(str(tmp_path / "test_model"))
+
+        loaded = djinn.load(str(tmp_path / "test_model"))
+        preds_before = loaded.predict(X_test)
+        loaded.continue_training(X_train, y_train, 20, 0.01, 8, seed=0)
+        preds_after = loaded.predict(X_test)
+        assert not np.allclose(preds_before, preds_after, atol=1e-6)
+
+        reloaded = djinn.load(str(tmp_path / "test_model"))
+        np.testing.assert_allclose(preds_after, reloaded.predict(X_test), rtol=1e-5)
+
 
 class TestHyperparameters:
     """Validation checks for hyperparameter dictionary outputs."""
