@@ -137,7 +137,25 @@ The original DJINN examples suggest ``dropout_keep_prob`` around 0.95 with 5
 to 10 trees. The spread reflects how unsure the networks are about their weights. It doesn't
 include the noise in the data, so check how often the true values fall inside
 the intervals on held-out data before relying on them.
-:doc:`examples/04_uncertainty` shows how.
+:doc:`examples/04_uncertainty` shows how. In our tests the 25-75% band held
+only 20-50% of the true values.
+
+.. _theory-calibration:
+
+Calibrated intervals
+--------------------
+:meth:`~djinn.DJINN_Regressor.predict_interval` uses split conformal
+prediction [AB2021]_ instead. :meth:`~djinn.DJINN_Regressor.calibrate` stores
+the absolute errors of :meth:`~djinn.DJINN_Regressor.predict` on data that
+wasn't used for training. For a coverage of 90%, the interval is the
+prediction plus or minus the error that 90% of those points fall within (with
+a small correction for the size of the calibration set). If new inputs come
+from the same distribution as the calibration data, at least 90% of their true
+values fall inside, whatever the model or the noise.
+
+The interval has the same width everywhere. We tried scaling it by the dropout
+spread of each point, but the spread is only weakly related to the actual
+error, so the intervals got wider without getting more reliable.
 
 Application: neutron transport
 ------------------------------
@@ -172,3 +190,7 @@ References
    Representing Model Uncertainty in Deep Learning," *Proceedings of the 33rd
    International Conference on Machine Learning*, PMLR 48:1050-1059, 2016.
    `arXiv:1506.02142 <https://arxiv.org/abs/1506.02142>`_.
+
+.. [AB2021] A. N. Angelopoulos and S. Bates, "A Gentle Introduction to
+   Conformal Prediction and Distribution-Free Uncertainty Quantification,"
+   2021. `arXiv:2107.07511 <https://arxiv.org/abs/2107.07511>`_.

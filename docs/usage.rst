@@ -142,8 +142,29 @@ through each network with dropout on:
     result["predictions"]  # all samples, (n_iters * n_trees, n_test, n_outputs)
 
 :meth:`~djinn.DJINN_Regressor.bayesian_predict` gives the same percentiles as a
-tuple, with the samples grouped by network. :doc:`examples/04_uncertainty`
-shows how to check whether the intervals can be trusted.
+tuple, with the samples grouped by network.
+
+These percentiles show how much the networks disagree, but they are usually
+too narrow to use as error bars. For intervals that hold a given share of the
+true values, set aside some data the model wasn't trained on and call
+:meth:`~djinn.DJINN_Regressor.calibrate` with it. Then
+:meth:`~djinn.DJINN_Regressor.predict_interval` returns lower and upper bounds
+for any coverage:
+
+.. code-block:: python
+
+    from sklearn.model_selection import train_test_split
+
+    X_fit, X_cal, y_fit, y_cal = train_test_split(X_train, y_train, test_size=0.2)
+    model.fit(X_fit, y_fit)
+    model.calibrate(X_cal, y_cal)
+
+    lower, upper = model.predict_interval(X_test, coverage=0.9)
+
+A few hundred calibration points are plenty. Fitting the model again clears
+the calibration, and :meth:`~djinn.DJINN_Regressor.save` keeps it.
+:doc:`examples/04_uncertainty` compares both kinds of interval, and
+:ref:`theory <theory-calibration>` explains how they work.
 
 Saving and loading
 ------------------

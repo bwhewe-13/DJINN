@@ -6,6 +6,20 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `DJINN_Regressor.calibrate()` and `predict_interval()` give prediction
+  intervals with a chosen coverage, using split conformal prediction on
+  held-out data. The intervals are kept by `save()` and cleared when the model
+  is fit again.
+
+### Documentation
+
+- The `bma_predict()` docstring, the theory and usage pages and the
+  uncertainty notebook say that the dropout percentiles aren't calibrated.
+  On the datasets we tried, the 25-75% band held only 20-50% of the true
+  values. The notebook now shows calibrated intervals as well.
+
 ## [1.2.1] - 2026-10-11
 
 ### Fixed
