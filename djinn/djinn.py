@@ -276,6 +276,11 @@ class _DJINNBase(BaseEstimator):
             "yscale": _scaler_state(self.yscale_),
             "y_1d": getattr(self, "_y_1d", False),
             "classes": None if classes is None else classes.tolist(),
+            "calibration_residuals": (
+                self.calibration_residuals_.tolist()
+                if hasattr(self, "calibration_residuals_")
+                else None
+            ),
         }
 
     def _save_json(self):
@@ -448,6 +453,7 @@ class _DJINNBase(BaseEstimator):
         self.model_path_ = model_path
 
         X, Y = self._validate_training_data(X, Y)
+        self.__dict__.pop("calibration_residuals_", None)
 
         self._y_1d = Y.ndim == 1
         if self._y_1d:
@@ -611,6 +617,8 @@ class _DJINNBase(BaseEstimator):
         obj.yscale_ = (
             _scaler_from_state(state["yscale"]) if state["yscale"] is not None else None
         )
+        if state.get("calibration_residuals") is not None:
+            obj.calibration_residuals_ = np.array(state["calibration_residuals"])
         return obj
 
     def load_model(self, model_name, model_path):
@@ -777,6 +785,11 @@ class _DJINNBase(BaseEstimator):
 
     def bma_predict(self, x_test, n_iters=100, seed=None):
         """Return Bayesian model averaging samples and summary statistics.
+
+        The percentiles show how much the networks disagree, but they are not
+        calibrated and usually hold fewer true values than their range
+        suggests. For regression, :meth:`DJINN_Regressor.predict_interval`
+        gives intervals with a known coverage.
 
         Parameters
         ----------
@@ -951,6 +964,7 @@ class _DJINNBase(BaseEstimator):
         )
         # Training updated the checkpoints on disk, not the models in memory
         self.load_model(self.model_name, self.model_path)
+        self.__dict__.pop("calibration_residuals_", None)
 
 
 class DJINN_Regressor(RegressorMixin, _DJINNBase):
@@ -1005,6 +1019,9 @@ class DJINN_Regressor(RegressorMixin, _DJINNBase):
     nninfo_ : dict
         Details from the last training run, including the loss per epoch in
         ``train_cost`` and ``valid_cost``. Not set on loaded models.
+    calibration_residuals_ : ndarray of shape (n_calibration, n_outputs)
+        Sorted absolute errors on the calibration data. Only set after
+        :meth:`calibrate`, and cleared when the model is trained again.
 
     Examples
     --------
@@ -1015,6 +1032,77 @@ class DJINN_Regressor(RegressorMixin, _DJINNBase):
     >>> model.fit(X, y).predict(X[:2]).shape
     (2,)
     """
+
+    def calibrate(self, X, y):
+        """Store the prediction errors on held-out data.
+
+        :meth:`predict_interval` uses them to set the interval width. ``X``
+        and ``y`` must not have been used to fit the model, otherwise
+        the errors are too small and the intervals too narrow.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Calibration inputs.
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Calibration targets.
+
+        Returns
+        -------
+        self
+        """
+        check_is_fitted(self, "xscale_")
+        X, y = validate_data(self, X, y, reset=False, multi_output=True, y_numeric=True)
+        pred = self.predict(X).reshape(len(y), -1)
+        errors = np.abs(y.reshape(len(y), -1) - pred)
+        self.calibration_residuals_ = np.sort(errors, axis=0)
+        return self
+
+    def predict_interval(self, X, coverage=0.9):
+        """Prediction intervals calibrated on held-out data.
+
+        Uses split conformal prediction: the interval is :meth:`predict`
+        plus or minus the error that a ``coverage`` fraction of the
+        calibration points fall within. If new data comes from the same
+        distribution as the calibration data, at least ``coverage`` of the
+        true values will be inside. The width is the same for every input.
+        Call :meth:`calibrate` first.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input feature matrix.
+        coverage : float, optional
+            Fraction of true values the intervals should contain.
+
+        Returns
+        -------
+        lower, upper : ndarray
+            Interval bounds, with the same shape as :meth:`predict`.
+
+        Raises
+        ------
+        ValueError
+            If ``coverage`` is not between 0 and 1, or there are too few
+            calibration points for it.
+        """
+        check_is_fitted(self, "calibration_residuals_")
+        if not 0 < coverage < 1:
+            raise ValueError(f"coverage must be between 0 and 1, got {coverage}.")
+        residuals = self.calibration_residuals_
+        n = len(residuals)
+        k = int(np.ceil((n + 1) * coverage - 1e-9))
+        if k > n:
+            raise ValueError(
+                f"{n} calibration points are too few for coverage={coverage}. "
+                f"Use at least {int(np.ceil(coverage / (1 - coverage) - 1e-9))}."
+            )
+        half_width = residuals[k - 1]
+
+        pred = self.predict(X)
+        if pred.ndim == 1:
+            half_width = half_width[0]
+        return pred - half_width, pred + half_width
 
     def __sklearn_tags__(self):
         tags = super().__sklearn_tags__()
