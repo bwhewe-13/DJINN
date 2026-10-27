@@ -112,8 +112,7 @@ _DEPRECATED_FIT_ARGS = {
 
 
 class _DJINNBase(BaseEstimator):
-    """Shared implementation for :class:`DJINN_Regressor` and
-    :class:`DJINN_Classifier`.
+    """Shared code for :class:`DJINN_Regressor` and :class:`DJINN_Classifier`.
 
     Parameters
     ----------
@@ -174,12 +173,12 @@ class _DJINNBase(BaseEstimator):
     # Old attribute names. Properties, since fit() may only add names ending in _
     @property
     def nninfo(self):
-        """dict or None: Training history and weights from the last fit."""
+        """Training history and weights from the last fit, or None."""
         return getattr(self, "nninfo_", None)
 
     @property
     def model_name(self):
-        """str or None: Name of the saved model directory."""
+        """Name of the saved model directory, or None."""
         return getattr(self, "model_name_", None)
 
     @model_name.setter
@@ -188,7 +187,7 @@ class _DJINNBase(BaseEstimator):
 
     @property
     def model_path(self):
-        """str or None: Parent directory of the saved model."""
+        """Parent directory of the saved model, or None."""
         return getattr(self, "model_path_", None)
 
     @model_path.setter
@@ -1105,6 +1104,7 @@ class DJINN_Regressor(RegressorMixin, _DJINNBase):
         return pred - half_width, pred + half_width
 
     def __sklearn_tags__(self):
+        """Mark the regressor as supporting multiple outputs."""
         tags = super().__sklearn_tags__()
         tags.target_tags.multi_output = True
         return tags
