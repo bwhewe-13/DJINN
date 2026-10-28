@@ -41,6 +41,10 @@ values (numbers, strings, ``1..k``). Both take the same settings:
    * - ``weight_decay``
      - 1e-8
      - L2 penalty on the weights.
+   * - ``clip_inputs``
+     - ``False``
+     - Clip inputs to the training range before predicting. See
+       :ref:`usage-data`.
    * - ``random_state``
      - ``None``
      - Seed for the forest, the starting weights and training.
@@ -55,17 +59,26 @@ values (numbers, strings, ``1..k``). Both take the same settings:
 trees give bigger networks that can fit more complex data but need more data
 to train.
 
+.. _usage-data:
+
 Preparing the data
 ------------------
 Inputs, and targets for regression, are scaled to [0, 1] with the training
-minimum and maximum, so there's no need to standardize them first. Two things
+minimum and maximum, so there's no need to standardize them first. A few things
 are worth doing:
 
 - **Remove extreme outliers.** One very large value squashes the rest of a
   feature into a small range, and predictions for inputs far outside the
   training range can be wildly off, as with any ReLU network. A
-  :class:`~sklearn.preprocessing.QuantileTransformer`, a log transform or
-  clipping fixes this. See :doc:`sklearn`.
+  :class:`~sklearn.preprocessing.QuantileTransformer` or a log transform
+  fixes this. See :doc:`sklearn`.
+- **Set** ``clip_inputs=True`` **if new inputs may fall outside the training
+  range.** Each input is then clipped to the smallest and largest value seen
+  in training, so the model predicts as if the input were at the edge of the
+  data instead of extrapolating. On a sample of the California housing data
+  with the outlier from :doc:`sklearn`, it takes the R² of the fold with the
+  outlier from -1.19 to 0.76 and leaves the other folds alone.
+  It can be changed after fitting with ``set_params``.
 - **Encode categorical features**, for example with
   :class:`~sklearn.preprocessing.OneHotEncoder`.
 

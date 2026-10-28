@@ -12,6 +12,9 @@ uses [Semantic Versioning](https://semver.org/).
   intervals with a chosen coverage, using split conformal prediction on
   held-out data. The intervals are kept by `save()` and cleared when the model
   is fit again.
+- `clip_inputs` option for both models. When it's on, inputs are clipped to the
+  training range before predicting, which stops the networks from
+  extrapolating far outside the data. It is off by default.
 
 ### Documentation
 
