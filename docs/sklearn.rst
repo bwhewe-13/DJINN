@@ -52,7 +52,9 @@ both. Text or categorical columns also need encoding:
 On the California housing data in :doc:`examples/05_scikit_learn`, one row
 with an average household size over 1,000 drops DJINN's R² on its
 cross-validation fold below zero. With the quantile transform, DJINN beats a
-random forest on every fold.
+random forest on every fold. ``DJINN_Regressor(clip_inputs=True)`` is a
+simpler fix for the second problem, since it stops the model from
+extrapolating, but it doesn't help with the first.
 
 Cross-validation and grid search
 --------------------------------
