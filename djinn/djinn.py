@@ -135,6 +135,10 @@ class _DJINNBase(BaseEstimator):
         Minibatch size used by :meth:`fit`. ``None`` uses 5% of the samples.
     weight_decay : float, optional
         Multiplier for the L2 penalty on weights.
+    clip_inputs : bool, optional
+        Clip inputs to the range seen in training before predicting. The
+        networks can give very large errors far outside that range, so
+        this trades extrapolation for safer predictions.
     random_state : int or None, optional
         Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
@@ -155,6 +159,7 @@ class _DJINNBase(BaseEstimator):
         learning_rate=None,
         batch_size=None,
         weight_decay=1.0e-8,
+        clip_inputs=False,
         random_state=None,
         device="cpu",
         verbose=0,
@@ -166,6 +171,7 @@ class _DJINNBase(BaseEstimator):
         self.learning_rate = learning_rate
         self.batch_size = batch_size
         self.weight_decay = weight_decay
+        self.clip_inputs = clip_inputs
         self.random_state = random_state
         self.device = device
         self.verbose = verbose
@@ -268,6 +274,7 @@ class _DJINNBase(BaseEstimator):
             "n_trees": self.n_trees_,
             "tree_max_depth": self.max_tree_depth,
             "dropout_keep_prob": self.dropout_keep_prob,
+            "clip_inputs": self.clip_inputs,
             "regression": self._regression,
             "model_name": model_name,
             "model_path": model_path,
@@ -603,6 +610,7 @@ class _DJINNBase(BaseEstimator):
             n_trees=state["n_trees"],
             max_tree_depth=state["tree_max_depth"],
             dropout_keep_prob=state["dropout_keep_prob"],
+            clip_inputs=state.get("clip_inputs", False),
         )
         obj.n_trees_ = state["n_trees"]
         obj.model_name_ = state["model_name"]
@@ -701,6 +709,8 @@ class _DJINNBase(BaseEstimator):
 
         device = self._torch_device()
         x_scaled = self.xscale_.transform(x_test)
+        if self.clip_inputs:
+            x_scaled = np.clip(x_scaled, 0, 1)
         x_tensor = torch.tensor(x_scaled, dtype=torch.float32, device=device)
 
         for tree_idx in range(self.n_trees_):
@@ -993,6 +1003,10 @@ class DJINN_Regressor(RegressorMixin, _DJINNBase):
         Minibatch size used by :meth:`fit`. ``None`` uses 5% of the samples.
     weight_decay : float, optional
         Multiplier for the L2 penalty on weights.
+    clip_inputs : bool, optional
+        Clip inputs to the range seen in training before predicting. The
+        networks can give very large errors far outside that range, so
+        this trades extrapolation for safer predictions.
     random_state : int or None, optional
         Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
@@ -1139,6 +1153,10 @@ class DJINN_Classifier(ClassifierMixin, _DJINNBase):
         Minibatch size used by :meth:`fit`. ``None`` uses 5% of the samples.
     weight_decay : float, optional
         Multiplier for the L2 penalty on weights.
+    clip_inputs : bool, optional
+        Clip inputs to the range seen in training before predicting. The
+        networks can give very large errors far outside that range, so
+        this trades extrapolation for safer predictions.
     random_state : int or None, optional
         Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
