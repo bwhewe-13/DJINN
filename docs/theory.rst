@@ -25,6 +25,13 @@ hyperparameter optimization on a range of regression and classification
 problems, at a much lower computational cost [HPM2019]_. The only settings left
 to the user are the number of trees and their maximum depth.
 
+Most of that benefit seems to come from the architecture. In our own tests
+(:doc:`benchmarks`), the same networks trained from random starting weights
+did just as well once they were trained for long enough. The tree weights only
+helped when training was cut short. So think of the trees as a cheap way to
+choose the size and sparsity of each network, more than as a better starting
+point for training.
+
 1. Grow a random forest
 -----------------------
 The inputs, and for regression the outputs, are scaled to [0, 1] with

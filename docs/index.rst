@@ -23,10 +23,10 @@
 DJINN: Deep Jointly-Informed Neural Networks
 ============================================
 DJINN builds an ensemble of neural networks from a random forest. Each
-decision tree sets the architecture and the starting weights of one network,
-and then the networks are trained with PyTorch. Most of the effort of
-designing a network is done by the trees, so the only settings to tune are the
-number of trees and their depth. With dropout, the ensemble also gives
+decision tree sets the architecture of one network and its starting weights,
+and then the networks are trained with PyTorch. The trees do the work of
+designing the networks, so the only settings to tune are the number of trees
+and their depth. With dropout, the ensemble also gives
 uncertainty estimates.
 
 DJINN was introduced by Humbird, Peterson and McClarren in
@@ -71,6 +71,7 @@ Both models are scikit-learn estimators, so they can be used in
    theory
    usage
    sklearn
+   benchmarks
 
 .. toctree::
    :maxdepth: 1
