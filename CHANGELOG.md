@@ -6,6 +6,17 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `nninfo_["initial_weights"]` and `nninfo_["initial_biases"]` hold the
+  weights each network started from. On CPU they used to change along with
+  the network during training and ended up equal to the final weights.
+
+### Documentation
+
+- New benchmarks page comparing tree initialization with random
+  initialization of the same networks. The script is in `benchmarks/`.
+
 ## [1.3.0] - 2026-10-27
 
 ### Added
