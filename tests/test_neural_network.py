@@ -284,6 +284,22 @@ def test_get_weights_and_biases_numpy_arrays():
     assert len(dense_b) == 2
 
 
+def test_get_weights_and_biases_returns_copies():
+    ttn = make_ttn_regression()
+    weights, biases = nnf.build_tree_weights_and_biases(ttn, "tree_0")
+    model = nnf.MultiLayerPerceptron(weights, biases, dropout_keep_prob=1.0)
+    dense_w, dense_b = nnf.get_weights_and_biases(model)
+    before_w = [w.copy() for w in dense_w]
+    before_b = [b.copy() for b in dense_b]
+
+    with torch.no_grad():
+        for param in model.parameters():
+            param.add_(1.0)
+
+    assert all(np.array_equal(w, b) for w, b in zip(dense_w, before_w))
+    assert all(np.array_equal(w, b) for w, b in zip(dense_b, before_b))
+
+
 def test_train_single_tree_histories(monkeypatch):
     monkeypatch.setattr(nnf, "train_one_epoch", lambda *a, **k: 0.75)
     monkeypatch.setattr(nnf, "evaluate", lambda *a, **k: 0.5)

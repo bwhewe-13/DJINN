@@ -759,8 +759,9 @@ def get_weights_and_biases(model):
         elif "bias" in name:
             dense_biases.append(param.data)
 
-    dense_weights = [w.detach().cpu().numpy() for w in dense_weights]
-    dense_biases = [b.detach().cpu().numpy() for b in dense_biases]
+    # Copy, or on CPU the arrays keep changing with the model during training
+    dense_weights = [w.detach().cpu().numpy().copy() for w in dense_weights]
+    dense_biases = [b.detach().cpu().numpy().copy() for b in dense_biases]
 
     return dense_weights, dense_biases
 
