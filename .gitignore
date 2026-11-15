@@ -37,6 +37,7 @@ coverage.xml
 
 # PT benchmark results - regenerated in CI, never committed
 results_pt.json
+benchmarks/results/
 
 # TF baseline - committed once, see README for regeneration instructions
 # results_tf.json
