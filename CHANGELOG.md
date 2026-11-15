@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-15
+
 ### Fixed
 
 - `nninfo_["initial_weights"]` and `nninfo_["initial_biases"]` hold the
@@ -146,7 +148,8 @@ public API (`DJINN_Regressor`, `DJINN_Classifier`, `train`, `fit`, `predict`,
 - `find_optimal_epochs()` no longer crashes when `max_training_epochs <= 200`.
 - Trees too shallow to build a hidden layer raise a clear error.
 
-[Unreleased]: https://github.com/bwhewe-13/DJINN/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/bwhewe-13/DJINN/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/bwhewe-13/DJINN/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/bwhewe-13/DJINN/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/bwhewe-13/DJINN/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/bwhewe-13/DJINN/compare/v1.1.2...v1.2.0
