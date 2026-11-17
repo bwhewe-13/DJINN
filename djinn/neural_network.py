@@ -348,6 +348,224 @@ def draw_rows(n, n_samples, generator):
     return torch.cat(chunks)
 
 
+def stack_networks(weights_list, biases_list, device):
+    """Zero-pad networks with the same number of layers and stack them.
+
+    The padded neurons have no inputs, outputs or bias, so their gradients
+    are zero and they stay zero during training.
+
+    Parameters
+    ----------
+    weights_list, biases_list : list[dict]
+        Per-network weights and biases from
+        :func:`build_tree_weights_and_biases`.
+    device : torch.device
+        Device for the stacked tensors.
+
+    Returns
+    -------
+    tuple[list[str], list[torch.Tensor], list[torch.Tensor]]
+        Layer keys, weights of shape ``(n_nets, n_in, n_out)`` and biases of
+        shape ``(n_nets, 1, n_out)``.
+    """
+    n_hidden = len([k for k in weights_list[0] if k.startswith("h")])
+    keys = [f"h{i}" for i in range(1, n_hidden + 1)] + ["out"]
+    n_nets = len(weights_list)
+    stacked_w, stacked_b = [], []
+    for key in keys:
+        n_in = max(w[key].shape[0] for w in weights_list)
+        n_out = max(w[key].shape[1] for w in weights_list)
+        w_stack = torch.zeros(n_nets, n_in, n_out)
+        b_stack = torch.zeros(n_nets, 1, n_out)
+        for i, (w, b) in enumerate(zip(weights_list, biases_list)):
+            rows, cols = w[key].shape
+            w_stack[i, :rows, :cols] = torch.as_tensor(w[key], dtype=torch.float32)
+            b_stack[i, 0, :cols] = torch.as_tensor(b[key], dtype=torch.float32)
+        stacked_w.append(w_stack.to(device).requires_grad_())
+        stacked_b.append(b_stack.to(device).requires_grad_())
+    return keys, stacked_w, stacked_b
+
+
+def unstack_network(keys, stacked_w, stacked_b, idx, shapes):
+    """Return network ``idx`` from a stack as weight and bias dicts."""
+    weights, biases = {}, {}
+    for key, w, b in zip(keys, stacked_w, stacked_b):
+        rows, cols = shapes[key]
+        weights[key] = w[idx, :rows, :cols].detach().cpu().numpy().copy()
+        biases[key] = b[idx, 0, :cols].detach().cpu().numpy().copy()
+    return weights, biases
+
+
+def stacked_forward(stacked_w, stacked_b, x, dropout_p=0.0):
+    """Forward pass of stacked networks, like :class:`MultiLayerPerceptron`.
+
+    ``x`` has shape ``(n_nets, n_rows, n_features)``. Dropout is applied
+    after the second and later hidden layers when ``dropout_p > 0``.
+    """
+    for i, (w, b) in enumerate(zip(stacked_w[:-1], stacked_b[:-1])):
+        x = torch.relu(torch.baddbmm(b, x, w))
+        if i >= 1 and dropout_p > 0:
+            x = F.dropout(x, dropout_p, training=True)
+    return torch.baddbmm(stacked_b[-1], x, stacked_w[-1])
+
+
+def stacked_loss(outputs, targets, regression):
+    """Mean loss of each network, shape ``(n_nets,)``.
+
+    Targets are floats of shape ``(n_nets, n_rows, n_out)`` for regression
+    and class indices of shape ``(n_nets, n_rows)`` for classification.
+    """
+    if regression:
+        return ((outputs - targets) ** 2).mean(dim=(1, 2))
+    n_nets, n_rows, n_out = outputs.shape
+    loss = F.cross_entropy(
+        outputs.reshape(-1, n_out), targets.reshape(-1), reduction="none"
+    )
+    return loss.reshape(n_nets, n_rows).mean(dim=1)
+
+
+class StackedAdam:
+    """Adam for stacked networks, with a learning rate per network.
+
+    Follows ``torch.optim.Adam`` (L2 ``weight_decay`` added to the gradient).
+    Each network's update only depends on its own slice, so this is the same
+    as running a separate Adam for every network.
+    """
+
+    def __init__(self, params, lr, weight_decay=0.0, eps=1e-8, betas=(0.9, 0.999)):
+        """Set up the optimizer state.
+
+        Parameters
+        ----------
+        params : list[torch.Tensor]
+            Stacked parameters, with the network as the first dimension.
+        lr : float or torch.Tensor
+            Learning rate, or one per network with shape ``(n_nets, 1, 1)``.
+        weight_decay : float, optional
+            L2 penalty added to the gradient.
+        eps : float, optional
+            Term added to the denominator.
+        betas : tuple[float, float], optional
+            Decay rates of the moment estimates.
+        """
+        self.params = params
+        self.lr = lr
+        self.weight_decay = weight_decay
+        self.eps = eps
+        self.betas = betas
+        self.step_count = 0
+        self.exp_avg = [torch.zeros_like(p) for p in params]
+        self.exp_avg_sq = [torch.zeros_like(p) for p in params]
+
+    def zero_grad(self):
+        """Clear the gradients."""
+        for p in self.params:
+            p.grad = None
+
+    @torch.no_grad()
+    def step(self):
+        """Update every parameter once."""
+        beta1, beta2 = self.betas
+        self.step_count += 1
+        bias_correction1 = 1 - beta1**self.step_count
+        bias_correction2_sqrt = (1 - beta2**self.step_count) ** 0.5
+        step_size = self.lr / bias_correction1
+        for p, m, v in zip(self.params, self.exp_avg, self.exp_avg_sq):
+            grad = p.grad
+            if self.weight_decay:
+                grad = grad.add(p, alpha=self.weight_decay)
+            m.lerp_(grad, 1 - beta1)
+            v.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+            denom = (v.sqrt() / bias_correction2_sqrt).add_(self.eps)
+            p.sub_(step_size * m / denom)
+
+
+def train_stacked(
+    stacked_w,
+    stacked_b,
+    xtrain,
+    ytrain,
+    regression,
+    generators,
+    batch_size,
+    epochs,
+    optimizer,
+    dropout_p=0.0,
+    xval=None,
+    yval=None,
+    eval_every=1,
+):
+    """Train stacked networks together, each on its own minibatches.
+
+    Parameters
+    ----------
+    stacked_w, stacked_b : list[torch.Tensor]
+        Parameters from :func:`stack_networks`, updated in place.
+    xtrain : torch.Tensor
+        Training features, shape ``(n_rows, n_features)``.
+    ytrain : torch.Tensor
+        Float targets of shape ``(n_rows, n_out)`` for regression, class
+        indices of shape ``(n_rows,)`` for classification.
+    regression : bool
+        True for regression (MSE), False for classification.
+    generators : list[torch.Generator]
+        One generator per network for drawing its minibatches.
+    batch_size : int
+        Mini-batch size.
+    epochs : int
+        Number of epochs.
+    optimizer : StackedAdam
+        Optimizer for the stacked parameters.
+    dropout_p : float, optional
+        Dropout probability.
+    xval, yval : torch.Tensor or None, optional
+        Validation data, same layout as the training data.
+    eval_every : int, optional
+        Evaluate the validation set every this many epochs.
+
+    Returns
+    -------
+    tuple[ndarray, ndarray or None]
+        Training and validation loss, shape ``(n_nets, epochs)``.
+    """
+    n_nets = len(generators)
+    n_rows = len(xtrain)
+    n_batches = max(1, n_rows // batch_size)
+    n_samples = n_batches * batch_size
+    device = xtrain.device
+    if xval is not None:
+        xval_stack = xval.expand(n_nets, *xval.shape)
+        yval_stack = yval.expand(n_nets, *yval.shape)
+        val_loss = torch.full((n_nets,), float("nan"), device=device)
+
+    train_history, valid_history = [], []
+    for epoch in range(epochs):
+        rows = torch.stack([draw_rows(n_rows, n_samples, g) for g in generators])
+        rows = rows.to(device).view(n_nets, n_batches, batch_size)
+        total = torch.zeros(n_nets, device=device)
+        for k in range(n_batches):
+            batch = rows[:, k]
+            outputs = stacked_forward(stacked_w, stacked_b, xtrain[batch], dropout_p)
+            loss = stacked_loss(outputs, ytrain[batch], regression)
+            optimizer.zero_grad()
+            loss.sum().backward()
+            optimizer.step()
+            total += loss.detach()
+        train_history.append(total / n_batches)
+
+        if xval is not None:
+            if (epoch + 1) % eval_every == 0 or epoch == epochs - 1:
+                with torch.no_grad():
+                    outputs = stacked_forward(stacked_w, stacked_b, xval_stack)
+                    val_loss = stacked_loss(outputs, yval_stack, regression)
+            valid_history.append(val_loss)
+
+    train_history = torch.stack(train_history, dim=1).cpu().numpy()
+    if xval is None:
+        return train_history, None
+    return train_history, torch.stack(valid_history, dim=1).cpu().numpy()
+
+
 def train_one_epoch(model, loader, criterion, optimizer):
     """Run one optimization epoch over the training loader.
 
@@ -376,9 +594,9 @@ def train_one_epoch(model, loader, criterion, optimizer):
         loss = criterion(outputs, yb)
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
+        total_loss += loss.detach()
 
-    return total_loss / len(loader)
+    return float(total_loss) / len(loader)
 
 
 @torch.no_grad()
@@ -514,37 +732,53 @@ def get_learning_rate(
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     loader = prepare_dataloader(xtrain, ytrain, regression, batch_size, device)
+    n_rows = len(loader.x)
+    n_samples = loader.n_batches * batch_size
+    epochs = 100
 
     minlr = -4.0
     maxlr = -2.0
     lrs = np.logspace(minlr, maxlr, 10)
 
-    # two refinement passes
+    # two refinement passes, training all the learning rates together
     for _ in range(2):
+        # Give each learning rate the minibatches it would get if they were
+        # trained one after another from the same generator
+        generators = []
+        for _ in lrs:
+            generator = torch.Generator()
+            generator.set_state(loader.generator.get_state())
+            generators.append(generator)
+            for _ in range(epochs):
+                draw_rows(n_rows, n_samples, loader.generator)
 
-        errormin = []
-        for lr in lrs:
+        layer_keys, stacked_w, stacked_b = stack_networks(
+            [weights] * len(lrs), [biases] * len(lrs), device
+        )
+        lr_tensor = torch.tensor(lrs, dtype=torch.float32, device=device)
+        optimizer = StackedAdam(
+            stacked_w + stacked_b,
+            lr_tensor.view(-1, 1, 1),
+            weight_decay,
+            eps=1e-8,
+        )
+        losses, _ = train_stacked(
+            stacked_w,
+            stacked_b,
+            loader.x,
+            loader.y,
+            regression,
+            generators,
+            batch_size,
+            epochs,
+            optimizer,
+            dropout_p=1.0 - dropout_keep_prob,
+        )
+        errormin = losses[:, 90:].mean(axis=1)
 
-            model = MultiLayerPerceptron(weights, biases, dropout_keep_prob).to(device)
-
-            losses = train_model(
-                model,
-                loader,
-                regression,
-                lr,
-                weight_decay,
-                epochs=100,
-                early_stop_patience=None,
-            )
-
-            errormin.append(np.mean(losses[90:]))
-
-        errormin = np.array(errormin)
         indices = errormin.argsort()[:2]
-
         minlr = min(lrs[indices[0]], lrs[indices[1]])
         maxlr = max(lrs[indices[0]], lrs[indices[1]])
-
         lrs = np.linspace(minlr, maxlr, 10)
 
     return minlr
@@ -1044,62 +1278,75 @@ def torch_dropout_regression(
         model_dir = get_unique_model_name(model_path)
         nninfo["model_dir"] = str(model_dir)
 
-    all_train_history = []
-    all_valid_history = []
+    if not regression:
+        ytrain, ytest = ytrain.argmax(dim=1), ytest.argmax(dim=1)
 
-    # loop through trees, training each network in ensemble
-    for idx, keys in enumerate(ttn["weights"]):
-        # Initialize model weights and biases from tree mapping.
-        # Pass seed and idx so each tree's bias draw is isolated from
-        # any numpy state consumed by earlier operations.
-        weights, biases = build_tree_weights_and_biases(
-            ttn, keys, seed=seed, tree_idx=idx
-        )
-        loader_seed = None if seed is None else seed * 1000 + idx
-        loader = prepare_dataloader(
-            xtrain, ytrain, regression, batch_size, device, seed=loader_seed
-        )
-
-        # Create model and optimizer for this tree
-        model = MultiLayerPerceptron(weights, biases, dropout_keep_prob).to(device)
-        criterion = nn.MSELoss() if regression else nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=lr,
-            weight_decay=weight_decay,
-            eps=1e-7,  # TF default
-        )
-
-        # Save initial weights/biases
+    keys = list(ttn["weights"])
+    # Pass seed and idx so each tree's bias draw is isolated from
+    # any numpy state consumed by earlier operations.
+    tree_params = [
+        build_tree_weights_and_biases(ttn, key, seed=seed, tree_idx=idx)
+        for idx, key in enumerate(keys)
+    ]
+    for (weights, biases), key in zip(tree_params, keys):
+        model = MultiLayerPerceptron(weights, biases, dropout_keep_prob)
         dense_weights, dense_biases = get_weights_and_biases(model)
-        nninfo["initial_weights"][keys] = dense_weights
-        nninfo["initial_biases"][keys] = dense_biases
+        nninfo["initial_weights"][key] = dense_weights
+        nninfo["initial_biases"][key] = dense_biases
 
-        # Train model and record history
-        model, train_hist, valid_hist = train_single_tree(
-            model,
-            loader,
-            criterion,
-            optimizer,
-            xtest,
-            ytest,
+    # Trees with the same number of layers are trained together
+    groups = {}
+    for idx, (weights, _) in enumerate(tree_params):
+        groups.setdefault(len(weights), []).append(idx)
+
+    all_train_history = [None] * len(keys)
+    all_valid_history = [None] * len(keys)
+    trained = {}
+    for idxs in groups.values():
+        layer_keys, stacked_w, stacked_b = stack_networks(
+            [tree_params[i][0] for i in idxs], [tree_params[i][1] for i in idxs], device
+        )
+        generators = []
+        for idx in idxs:
+            generator = torch.Generator()
+            if seed is not None:
+                generator.manual_seed(seed * 1000 + idx)
+            generators.append(generator)
+        optimizer = StackedAdam(
+            stacked_w + stacked_b, lr, weight_decay, eps=1e-7  # TF default
+        )
+        train_hist, valid_hist = train_stacked(
+            stacked_w,
+            stacked_b,
+            xtrain,
+            ytrain,
+            regression,
+            generators,
+            batch_size,
             n_epochs,
+            optimizer,
+            dropout_p=1.0 - dropout_keep_prob,
+            xval=xtest,
+            yval=ytest,
             eval_every=kwargs.get("eval_every", 1),
         )
+        for j, idx in enumerate(idxs):
+            shapes = {k: tree_params[idx][0][k].shape for k in layer_keys}
+            trained[idx] = unstack_network(layer_keys, stacked_w, stacked_b, j, shapes)
+            all_train_history[idx] = train_hist[j].tolist()
+            all_valid_history[idx] = valid_hist[j].tolist()
 
-        # Save final weights/biases
+    for idx, key in enumerate(keys):
+        weights, biases = trained[idx]
+        model = MultiLayerPerceptron(weights, biases, dropout_keep_prob).to(device)
         dense_weights, dense_biases = get_weights_and_biases(model)
-        nninfo["final_weights"][keys] = dense_weights
-        nninfo["final_biases"][keys] = dense_biases
+        nninfo["final_weights"][key] = dense_weights
+        nninfo["final_biases"][key] = dense_biases
 
         # Always keep the live model in memory regardless of save_model
         nninfo["models"][idx] = model
-
         if save_model:
             save_tree_model(model, idx, ttn, model_dir)
-
-        all_train_history.append(train_hist)
-        all_valid_history.append(valid_hist)
 
     # Save experiment metadata
     if len(all_train_history) == 1:
