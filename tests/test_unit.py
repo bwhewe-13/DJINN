@@ -10,6 +10,7 @@ Tests that must pass in both implementations live in test_unit_shared.py.
 
 import numpy as np
 import pytest
+import torch
 from sklearn.model_selection import train_test_split
 
 from djinn import djinn
@@ -575,3 +576,47 @@ class TestEdgeCases:
         model = make_model()
         train(model, X_train, y_train, ntrees=3, epochs=2)
         assert not np.any(np.isnan(model.predict(X_test)))
+
+
+def _available(device):
+    """Return True if ``device`` can be used on this machine."""
+    if device == "cuda":
+        return torch.cuda.is_available()
+    return torch.backends.mps.is_available()
+
+
+class TestDevice:
+    """Training and prediction on a GPU."""
+
+    @pytest.mark.parametrize("device", ["cuda", "mps"])
+    def test_fit_and_predict(self, device, small_data, tmp_path):
+        """Verify a model trains, predicts and reloads on ``device``.
+
+        Parameters
+        ----------
+        device : str
+            Device to test.
+        small_data : tuple
+            Fixture providing train/test splits.
+        tmp_path : pathlib.Path
+            Temporary directory for the saved model.
+
+        Returns
+        -------
+        None
+            Assertion-based test.
+        """
+        if not _available(device):
+            pytest.skip(f"{device} is not available")
+        X_train, X_test, y_train, _ = small_data
+        model = djinn.DJINN_Regressor(
+            n_trees=2, learning_rate=1e-3, epochs=3, random_state=0, device=device
+        )
+        model.fit(X_train, y_train)
+        preds = model.predict(X_test)
+        assert preds.shape[0] == X_test.shape[0]
+        assert not np.any(np.isnan(preds))
+
+        model.save(str(tmp_path / "model"))
+        loaded = djinn.load(str(tmp_path / "model"))
+        assert np.allclose(loaded.predict(X_test), preds, atol=1e-5)

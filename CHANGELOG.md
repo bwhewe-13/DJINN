@@ -6,6 +6,24 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Training is much faster. The trees are trained at the same time instead of
+  one after another, and so are the learning rates tried by the
+  hyperparameter search. Minibatches are taken straight from the data tensors
+  instead of through a `DataLoader`. On 1,000 rows, fitting 5 trees is about
+  10 times faster on the CPU and the learning rate search about 13 times
+  faster. Results for a given `random_state` can differ slightly from 1.3.1,
+  since the order of floating point operations changed.
+
+### Added
+
+- `device="auto"` uses CUDA if it is available, then MPS, then the CPU.
+
+### Fixed
+
+- Training on a GPU (`device="cuda"`) no longer fails with a device mismatch.
+
 ## [1.3.1] - 2026-11-15
 
 ### Fixed

@@ -51,11 +51,19 @@ Then open ``docs/_build/html/index.html``.
 
 CPU and GPU
 -----------
-Models train on the CPU by default. Pass ``device="cuda"`` (or any
-:class:`torch.device`) to the constructor to train and predict on a GPU:
+Models train on the CPU by default. Pass ``device="cuda"`` for an NVIDIA GPU,
+``device="mps"`` for Apple silicon, or any :class:`torch.device`, to train and
+predict on that device. ``device="auto"`` uses CUDA if it is available, then
+MPS, then the CPU:
 
 .. code-block:: python
 
     from djinn import DJINN_Regressor
 
     model = DJINN_Regressor(n_trees=5, device="cuda")
+
+DJINN's networks are small, so a GPU only pays off once there is enough data
+to keep it busy. As a rough guide, comparing two CPU threads with an RTX 2060,
+on 1,000 rows the CPU was about three times faster, and on 20,000 rows the GPU
+was about three times faster for training and nine times faster for the
+learning rate search.

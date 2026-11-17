@@ -3,6 +3,7 @@
 import json
 
 import numpy as np
+import pytest
 import torch
 import torch.nn as nn
 from sklearn.preprocessing import MinMaxScaler
@@ -34,6 +35,29 @@ def make_ttn_regression():
             ]
         },
         "biases": {"tree_0": []},
+    }
+
+
+def make_ttn_two_widths(n_out=1):
+    """Two trees with different hidden widths."""
+    return {
+        "n_in": 2,
+        "n_out": n_out,
+        "network_shape": {"tree_0": [2, 3, n_out], "tree_1": [2, 5, n_out]},
+        "weights": {
+            "tree_0": [
+                np.array([[0.2, -0.1], [0.1, 0.3], [0.5, -0.4]], dtype=np.float32),
+                np.full((n_out, 3), 0.3, dtype=np.float32),
+            ],
+            "tree_1": [
+                np.array(
+                    [[0.1, 0.2], [0.0, -0.3], [0.2, 0.4], [0.3, 0.1], [-0.2, 0.5]],
+                    dtype=np.float32,
+                ),
+                np.full((n_out, 5), -0.2, dtype=np.float32),
+            ],
+        },
+        "biases": {"tree_0": [], "tree_1": []},
     }
 
 
@@ -136,6 +160,123 @@ def test_prepare_dataloader_samples_full_batches_like_tf():
     assert all(torch.equal(a, b) for (a, _), b in zip(again, batches))
 
 
+def test_stack_networks_pads_with_zeros():
+    ttn = make_ttn_two_widths()
+    params = [
+        nnf.build_tree_weights_and_biases(ttn, key, seed=0, tree_idx=i)
+        for i, key in enumerate(ttn["weights"])
+    ]
+    keys, stacked_w, stacked_b = nnf.stack_networks(
+        [w for w, _ in params], [b for _, b in params], torch.device("cpu")
+    )
+    assert keys == ["h1", "out"]
+    assert stacked_w[0].shape == (2, 2, 5)
+    assert torch.all(stacked_w[0][0, :, 3:] == 0)
+    assert torch.all(stacked_w[1][0, 3:] == 0)
+
+    shapes = {k: params[0][0][k].shape for k in keys}
+    weights, biases = nnf.unstack_network(keys, stacked_w, stacked_b, 0, shapes)
+    for key in keys:
+        assert np.array_equal(weights[key], params[0][0][key])
+        assert np.allclose(biases[key], params[0][1][key])
+
+
+@pytest.mark.parametrize("regression", [True, False])
+def test_stacked_training_matches_separate_networks(regression):
+    device = torch.device("cpu")
+    n_out = 1 if regression else 2
+    ttn = make_ttn_two_widths(n_out)
+    if regression:
+        x, y = make_regression_data(40)
+        ytrain = torch.as_tensor(y)
+    else:
+        x, y = make_classification_data(40)
+        ytrain = torch.as_tensor(y)
+    keys = list(ttn["weights"])
+    params = [
+        nnf.build_tree_weights_and_biases(ttn, key, seed=0, tree_idx=i)
+        for i, key in enumerate(keys)
+    ]
+    # A large eps keeps Adam from blowing up rounding noise in near-zero
+    # gradients, which differs between CPUs
+    epochs, lr, weight_decay, eps = 2, 1e-2, 1e-3, 1e-3
+
+    separate = []
+    for i, (weights, biases) in enumerate(params):
+        loader = nnf.prepare_dataloader(x, y, regression, 8, device, seed=i)
+        model = nnf.MultiLayerPerceptron(weights, biases, dropout_keep_prob=1.0)
+        criterion = nn.MSELoss() if regression else nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(
+            model.parameters(), lr=lr, weight_decay=weight_decay, eps=eps
+        )
+        for _ in range(epochs):
+            nnf.train_one_epoch(model, loader, criterion, optimizer)
+        separate.append(model)
+
+    layer_keys, stacked_w, stacked_b = nnf.stack_networks(
+        [w for w, _ in params], [b for _, b in params], device
+    )
+    optimizer = nnf.StackedAdam(stacked_w + stacked_b, lr, weight_decay, eps=eps)
+    generators = [torch.Generator().manual_seed(i) for i in range(len(params))]
+    history, _ = nnf.train_stacked(
+        stacked_w,
+        stacked_b,
+        torch.as_tensor(x),
+        ytrain,
+        regression,
+        generators,
+        8,
+        epochs,
+        optimizer,
+    )
+    assert history.shape == (2, epochs)
+
+    for i, model in enumerate(separate):
+        shapes = {k: params[i][0][k].shape for k in layer_keys}
+        weights, biases = nnf.unstack_network(
+            layer_keys, stacked_w, stacked_b, i, shapes
+        )
+        layers = [*model.hidden_layers, model.output_layer]
+        for key, layer in zip(layer_keys, layers):
+            expected = layer.weight.detach().numpy().T
+            assert np.allclose(weights[key], expected, atol=1e-6)
+            assert np.allclose(biases[key], layer.bias.detach().numpy(), atol=1e-6)
+
+
+def test_stacked_adam_matches_torch_adam_per_network():
+    torch.manual_seed(0)
+    lrs = [1e-3, 1e-2]
+    start = torch.randn(2, 3, 4)
+    stacked = start.clone().requires_grad_()
+    optimizer = nnf.StackedAdam(
+        [stacked], torch.tensor(lrs).view(-1, 1, 1), weight_decay=0.1
+    )
+    singles = [start[i].clone().requires_grad_() for i in range(2)]
+    torch_opts = [
+        torch.optim.Adam([p], lr=lr, weight_decay=0.1, eps=1e-8)
+        for p, lr in zip(singles, lrs)
+    ]
+    for _ in range(5):
+        grad = torch.randn(2, 3, 4)
+        stacked.grad = grad.clone()
+        optimizer.step()
+        for i, (p, opt) in enumerate(zip(singles, torch_opts)):
+            p.grad = grad[i].clone()
+            opt.step()
+    for i, p in enumerate(singles):
+        assert torch.allclose(stacked[i], p, atol=1e-6)
+
+
+def test_resolve_device(monkeypatch):
+    assert nnf.resolve_device("cpu") == torch.device("cpu")
+    assert nnf.resolve_device(torch.device("cpu")) == torch.device("cpu")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    assert nnf.resolve_device("auto") == torch.device("cpu")
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
+    assert nnf.resolve_device("auto") == torch.device("mps")
+
+
 def test_train_one_epoch_returns_float_loss():
     ttn = make_ttn_regression()
     weights, biases = nnf.build_tree_weights_and_biases(ttn, "tree_0")
@@ -189,13 +330,7 @@ def test_train_model_returns_epoch_losses():
     assert all(np.isfinite(v) for v in losses)
 
 
-def test_get_learning_rate_runs(monkeypatch):
-    def fake_train_model(*args, **kwargs):
-        lr = args[3]
-        return [1.0 + float(lr)] * 100
-
-    monkeypatch.setattr(nnf, "train_model", fake_train_model)
-
+def test_get_learning_rate_runs():
     ttn = make_ttn_regression()
     weights, biases = nnf.build_tree_weights_and_biases(ttn, "tree_0")
     x, y = make_regression_data()
@@ -212,6 +347,7 @@ def test_get_learning_rate_runs(monkeypatch):
         device=torch.device("cpu"),
     )
     assert isinstance(lr, float)
+    assert 1e-4 <= lr <= 1e-2
 
 
 def test_find_optimal_epochs_runs(monkeypatch):
