@@ -265,6 +265,16 @@ def test_stacked_adam_matches_torch_adam_per_network():
         assert torch.allclose(stacked[i], p, atol=1e-6)
 
 
+def test_resolve_device(monkeypatch):
+    assert nnf.resolve_device("cpu") == torch.device("cpu")
+    assert nnf.resolve_device(torch.device("cpu")) == torch.device("cpu")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    assert nnf.resolve_device("auto") == torch.device("cpu")
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: True)
+    assert nnf.resolve_device("auto") == torch.device("mps")
+
+
 def test_train_one_epoch_returns_float_loss():
     ttn = make_ttn_regression()
     weights, biases = nnf.build_tree_weights_and_biases(ttn, "tree_0")

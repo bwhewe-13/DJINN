@@ -56,6 +56,23 @@ class NumpyEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
+def resolve_device(device):
+    """Return ``device`` as a ``torch.device``.
+
+    ``"auto"`` (or ``None``) picks CUDA if it is available, then Apple's MPS,
+    then the CPU.
+    """
+    if isinstance(device, torch.device):
+        return device
+    if device is None or device == "auto":
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        if torch.backends.mps.is_available():
+            return torch.device("mps")
+        return torch.device("cpu")
+    return torch.device(device)
+
+
 def scale_data(x, y, xscale, yscale, regression, seed, n_classes, test=False):
     """Scale data and split into a training subset.
 
@@ -726,10 +743,7 @@ def get_learning_rate(
         Selected learning rate.
     """
 
-    if isinstance(device, str):
-        device = torch.device(device)
-    elif device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device(device)
 
     loader = prepare_dataloader(xtrain, ytrain, regression, batch_size, device)
     n_rows = len(loader.x)
@@ -830,10 +844,7 @@ def find_optimal_epochs(
         Estimated number of training epochs.
     """
 
-    if isinstance(device, str):
-        device = torch.device(device)
-    elif device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device(device)
 
     # Build dataloader once
     loader = prepare_dataloader(xtrain, ytrain, regression, batch_size, device)
@@ -1234,9 +1245,7 @@ def torch_dropout_regression(
     save_model = kwargs.get("save_model", True)
     save_files = kwargs.get("save_files", True)
     model_path = kwargs.get("model_path", "djinn_model")
-    device = kwargs.get("device", "cpu")
-    if isinstance(device, str):
-        device = torch.device(device)
+    device = resolve_device(kwargs.get("device", "cpu"))
 
     # Set Seed
     seed = kwargs.get("seed", None)
@@ -1278,6 +1287,8 @@ def torch_dropout_regression(
         model_dir = get_unique_model_name(model_path)
         nninfo["model_dir"] = str(model_dir)
 
+    xtrain, ytrain = xtrain.to(device), ytrain.to(device)
+    xtest, ytest = xtest.to(device), ytest.to(device)
     if not regression:
         ytrain, ytest = ytrain.argmax(dim=1), ytest.argmax(dim=1)
 
@@ -1577,10 +1588,7 @@ def torch_continue_training(
         Re-saves tree checkpoints and writes retraining metadata.
     """
 
-    if isinstance(device, str):
-        device = torch.device(device)
-    elif device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = resolve_device(device)
     model_dir = Path(model_dir)
 
     if seed is not None:

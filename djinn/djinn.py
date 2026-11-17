@@ -42,6 +42,7 @@ from sklearn.utils.validation import check_is_fitted, validate_data
 from djinn.neural_network import (
     get_hyperparams,
     load_tree_model,
+    resolve_device,
     torch_continue_training,
     torch_dropout_regression,
 )
@@ -142,7 +143,9 @@ class _DJINNBase(BaseEstimator):
     random_state : int or None, optional
         Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
-        Device used for training and inference.
+        Device used for training and inference, such as ``"cpu"``,
+        ``"cuda"`` or ``"mps"``. ``"auto"`` picks CUDA if it is available,
+        then MPS, then the CPU. Default ``"cpu"``.
     verbose : int, optional
         Print progress messages when greater than 0.
     """
@@ -208,7 +211,7 @@ class _DJINNBase(BaseEstimator):
         torch.device
             Device used for training and inference.
         """
-        return torch.device(self.device)
+        return resolve_device(self.device)
 
     def _fit_scalers(self, X, Y):
         """Fit MinMax scalers on raw data.
@@ -1010,7 +1013,9 @@ class DJINN_Regressor(RegressorMixin, _DJINNBase):
     random_state : int or None, optional
         Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
-        Device used for training and inference.
+        Device used for training and inference, such as ``"cpu"``,
+        ``"cuda"`` or ``"mps"``. ``"auto"`` picks CUDA if it is available,
+        then MPS, then the CPU. Default ``"cpu"``.
     verbose : int, optional
         Print progress messages when greater than 0.
 
@@ -1160,7 +1165,9 @@ class DJINN_Classifier(ClassifierMixin, _DJINNBase):
     random_state : int or None, optional
         Seed for the forest, weight initialization, and training.
     device : str or torch.device, optional
-        Device used for training and inference.
+        Device used for training and inference, such as ``"cpu"``,
+        ``"cuda"`` or ``"mps"``. ``"auto"`` picks CUDA if it is available,
+        then MPS, then the CPU. Default ``"cpu"``.
     verbose : int, optional
         Print progress messages when greater than 0.
 
