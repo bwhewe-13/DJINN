@@ -32,7 +32,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -270,7 +269,7 @@ def prepare_dataloader(xtrain, ytrain, regression, batch_size, device, seed=None
 
     Returns
     -------
-    torch.utils.data.DataLoader
+    BatchLoader
         Training dataloader.
     """
 
@@ -287,18 +286,66 @@ def prepare_dataloader(xtrain, ytrain, regression, batch_size, device, seed=None
             ytrain = torch.as_tensor(ytrain, dtype=torch.long)
         ytrain = ytrain.to(device)
 
-    dataset = TensorDataset(xtrain, ytrain)
     generator = torch.Generator()
     if seed is not None:
         generator.manual_seed(seed)
-    n_batches = max(1, len(dataset) // batch_size)
-    sampler = RandomSampler(
-        dataset,
-        replacement=True,
-        num_samples=n_batches * batch_size,
-        generator=generator,
+    return BatchLoader(xtrain, ytrain, batch_size, generator)
+
+
+class BatchLoader:
+    """Minibatches of rows drawn with replacement.
+
+    Gives the same batches as a ``DataLoader`` with a ``RandomSampler``
+    (``replacement=True``), but indexes the tensors directly instead of
+    collating one row at a time, which was most of the training time.
+    """
+
+    def __init__(self, x, y, batch_size, generator):
+        """Store the data and the sampling generator.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Training features.
+        y : torch.Tensor
+            Training targets.
+        batch_size : int
+            Mini-batch size.
+        generator : torch.Generator
+            Generator used to draw the rows.
+        """
+        self.x = x
+        self.y = y
+        self.batch_size = batch_size
+        self.generator = generator
+        self.n_batches = max(1, len(x) // batch_size)
+
+    def __len__(self):
+        """Return the number of batches per epoch."""
+        return self.n_batches
+
+    def __iter__(self):
+        """Yield ``(x, y)`` batches for one epoch."""
+        n_samples = self.n_batches * self.batch_size
+        idx = draw_rows(len(self.x), n_samples, self.generator).to(self.x.device)
+        for batch in idx.split(self.batch_size):
+            yield self.x[batch], self.y[batch]
+
+
+def draw_rows(n, n_samples, generator):
+    """Draw ``n_samples`` row indices from ``range(n)`` with replacement.
+
+    Uses the same calls as ``RandomSampler(replacement=True)``, in chunks of
+    32, so a seeded generator gives the same rows as before.
+    """
+    chunks = [
+        torch.randint(n, (32,), dtype=torch.int64, generator=generator)
+        for _ in range(n_samples // 32)
+    ]
+    chunks.append(
+        torch.randint(n, (n_samples % 32,), dtype=torch.int64, generator=generator)
     )
-    return DataLoader(dataset, batch_size=batch_size, sampler=sampler)
+    return torch.cat(chunks)
 
 
 def train_one_epoch(model, loader, criterion, optimizer):
@@ -308,7 +355,7 @@ def train_one_epoch(model, loader, criterion, optimizer):
     ----------
     model : nn.Module
         Model to train.
-    loader : torch.utils.data.DataLoader
+    loader : BatchLoader
         Mini-batch dataloader for training data.
     criterion : callable
         Loss function used to compute training loss.
@@ -374,7 +421,7 @@ def train_model(
     ----------
     model : nn.Module
         Model to optimize.
-    loader : torch.utils.data.DataLoader
+    loader : BatchLoader
         Training batches.
     regression : bool
         True for regression (MSE), False for classification.
@@ -775,7 +822,7 @@ def train_single_tree(
     ----------
     model : nn.Module
         Network initialized from one mapped tree.
-    loader : torch.utils.data.DataLoader
+    loader : BatchLoader
         Training dataloader.
     criterion : callable
         Loss function used for training and validation.
@@ -1106,7 +1153,7 @@ def load_tree_data(xscale, yscale, x, y, regression, batch_size, device):
 
     Returns
     -------
-    torch.utils.data.DataLoader
+    BatchLoader
         Shuffled dataloader for retraining.
     """
     # Scale training data
