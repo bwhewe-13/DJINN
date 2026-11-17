@@ -6,6 +6,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-16
+
 ### Changed
 
 - Training is much faster. The trees are trained at the same time instead of
@@ -166,7 +168,8 @@ public API (`DJINN_Regressor`, `DJINN_Classifier`, `train`, `fit`, `predict`,
 - `find_optimal_epochs()` no longer crashes when `max_training_epochs <= 200`.
 - Trees too shallow to build a hidden layer raise a clear error.
 
-[Unreleased]: https://github.com/bwhewe-13/DJINN/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/bwhewe-13/DJINN/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/bwhewe-13/DJINN/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/bwhewe-13/DJINN/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/bwhewe-13/DJINN/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/bwhewe-13/DJINN/compare/v1.2.0...v1.2.1
