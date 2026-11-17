@@ -197,7 +197,9 @@ def test_stacked_training_matches_separate_networks(regression):
         nnf.build_tree_weights_and_biases(ttn, key, seed=0, tree_idx=i)
         for i, key in enumerate(keys)
     ]
-    epochs, lr, weight_decay = 2, 1e-2, 1e-3
+    # A large eps keeps Adam from blowing up rounding noise in near-zero
+    # gradients, which differs between CPUs
+    epochs, lr, weight_decay, eps = 2, 1e-2, 1e-3, 1e-3
 
     separate = []
     for i, (weights, biases) in enumerate(params):
@@ -205,7 +207,7 @@ def test_stacked_training_matches_separate_networks(regression):
         model = nnf.MultiLayerPerceptron(weights, biases, dropout_keep_prob=1.0)
         criterion = nn.MSELoss() if regression else nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(
-            model.parameters(), lr=lr, weight_decay=weight_decay, eps=1e-7
+            model.parameters(), lr=lr, weight_decay=weight_decay, eps=eps
         )
         for _ in range(epochs):
             nnf.train_one_epoch(model, loader, criterion, optimizer)
@@ -214,7 +216,7 @@ def test_stacked_training_matches_separate_networks(regression):
     layer_keys, stacked_w, stacked_b = nnf.stack_networks(
         [w for w, _ in params], [b for _, b in params], device
     )
-    optimizer = nnf.StackedAdam(stacked_w + stacked_b, lr, weight_decay, eps=1e-7)
+    optimizer = nnf.StackedAdam(stacked_w + stacked_b, lr, weight_decay, eps=eps)
     generators = [torch.Generator().manual_seed(i) for i in range(len(params))]
     history, _ = nnf.train_stacked(
         stacked_w,
