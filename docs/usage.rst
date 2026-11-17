@@ -50,7 +50,8 @@ values (numbers, strings, ``1..k``). Both take the same settings:
      - Seed for the forest, the starting weights and training.
    * - ``device``
      - ``"cpu"``
-     - Torch device used for training and prediction.
+     - Torch device used for training and prediction, such as ``"cuda"``,
+       ``"mps"`` or ``"auto"``. See :doc:`install`.
    * - ``verbose``
      - 0
      - Print progress when greater than 0.

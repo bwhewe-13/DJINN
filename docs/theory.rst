@@ -101,6 +101,12 @@ to stop training early.
 When ``dropout_keep_prob`` is below 1, dropout is applied after the second and
 later hidden layers.
 
+The networks don't share anything, but to save time they are trained at the
+same time. Networks with the same number of layers are padded with zeros to
+the same widths and stacked, so one batched matrix product runs a step for all
+of them. The padding has no inputs or outputs, so it gets no gradient and stays
+zero, and each network keeps its own minibatches and optimizer state.
+
 4. Pick the hyperparameters
 ---------------------------
 When ``learning_rate`` is ``None``, :meth:`~djinn.DJINN_Regressor.fit` runs
@@ -111,7 +117,8 @@ from the first tree:
 - **Learning rate.** Ten learning rates spaced evenly in log scale between
   :math:`10^{-4}` and :math:`10^{-2}` are each trained for 100 epochs. The
   range is narrowed to the two with the lowest loss over the last 10 epochs,
-  and the search is repeated once on that range.
+  and the search is repeated once on that range. The ten learning rates in
+  each round are trained at the same time, in the same way as the trees.
 - **Epochs.** The network is trained with that learning rate in blocks of 10
   epochs, starting after 200, until the mean loss of each of the last two
   blocks differs by less than 5% from the block before. The cap is 3000
